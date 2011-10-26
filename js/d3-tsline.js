@@ -245,21 +245,22 @@ function d3_tsline() {
             .attr("x", 0)
             .attr("y", h + 1)
             .attr("width", this.slider.w)
-            .attr("height", 14)
+            .attr("height", 14);
+
+        slider
             .call(d3.behavior.drag()
                   .on("dragstart", function(d) {
-                      this.origin = self.slider.x;
-                      this.tot_dx = 0;
+                      this.__origin__ = self.slider.x;
+                      this.__offset__ = 0;
                   })
                   .on("drag", function(d) {
-                      this.tot_dx += d3.event.dx;
-                      self.move_slider(this.origin, this.tot_dx);
+                      this.__offset__ += d3.event.dx;
+                      self.move_slider(this.__origin__, this.__offset__);
                   })
                   .on("dragend", function() {
-                      delete this.origin;
-                      delete this.tot_dx;
+                      delete this.__origin__;
+                      delete this.__offset__;
                   }));
-
 
     };
 
