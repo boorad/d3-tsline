@@ -245,24 +245,27 @@ function d3_tsline() {
             .attr("x", 0)
             .attr("y", h + 1)
             .attr("width", this.slider.w)
-            .attr("height", 14)
+            .attr("height", 14);
+
+        slider
             .call(d3.behavior.drag()
                   .on("dragstart", function(d) {
-                      this.diff = event.x - self.slider.x - lm;
+                      this.__origin__ = self.slider.x;
+                      this.__offset__ = 0;
                   })
                   .on("drag", function(d) {
-                      //console.log(d3.event);
-                      self.move_slider(event.x - lm, this.diff);
+                      this.__offset__ += d3.event.dx;
+                      self.move_slider(this.__origin__, this.__offset__);
                   })
                   .on("dragend", function() {
-                      //delete this.__origin__;
+                      delete this.__origin__;
+                      delete this.__offset__;
                   }));
-
 
     };
 
-    this.move_slider = function(x, diff) {
-        this.slider.x = x - diff;
+    this.move_slider = function(origin, dx) {
+        this.slider.x = origin + dx;
         if( this.slider.x < 0 ) this.slider.x = 0;
         if( this.slider.x > this.slider.max_x )
             this.slider.x = this.slider.max_x;
