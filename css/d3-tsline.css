@@ -1,0 +1,65 @@
+body {
+    font: 10px sans-serif;
+    margin: 0;
+}
+
+.view, .summary {
+    shape-rendering: crispEdges;
+}
+
+path.line {
+    fill: none;
+    stroke: #46f;
+    stroke-width: 1px;
+    shape-rendering: auto;
+}
+
+path.area {
+    fill: #49f;
+    opacity: .05;
+}
+
+.axis {
+    shape-rendering: crispEdges;
+}
+
+.x.axis line {
+    display: none;
+    stroke: #fff;
+}
+
+.x.axis .minor {
+    stroke-opacity: .5;
+}
+
+.x.axis path {
+    display: none;
+}
+
+.y.axis line, .y.axis path, rect.border {
+    fill: none;
+    stroke: #000;
+    stroke-width: 1px;
+}
+
+.summary .border {
+    stroke: #ddd;
+}
+
+.summary .top_border {
+    stroke: #000;
+}
+
+.slider {
+    fill: none;
+    stroke: #000;
+}
+
+.slider-top-border {
+    stroke: #fff;
+}
+
+.slider rect.handle {
+    cursor: pointer;
+    fill: #eee;
+}
