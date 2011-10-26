@@ -248,21 +248,23 @@ function d3_tsline() {
             .attr("height", 14)
             .call(d3.behavior.drag()
                   .on("dragstart", function(d) {
-                      this.diff = event.x - self.slider.x - lm;
+                      this.origin = self.slider.x;
+                      this.tot_dx = 0;
                   })
                   .on("drag", function(d) {
-                      //console.log(d3.event);
-                      self.move_slider(event.x - lm, this.diff);
+                      this.tot_dx += d3.event.dx;
+                      self.move_slider(this.origin, this.tot_dx);
                   })
                   .on("dragend", function() {
-                      //delete this.__origin__;
+                      delete this.origin;
+                      delete this.tot_dx;
                   }));
 
 
     };
 
-    this.move_slider = function(x, diff) {
-        this.slider.x = x - diff;
+    this.move_slider = function(origin, dx) {
+        this.slider.x = origin + dx;
         if( this.slider.x < 0 ) this.slider.x = 0;
         if( this.slider.x > this.slider.max_x )
             this.slider.x = this.slider.max_x;
