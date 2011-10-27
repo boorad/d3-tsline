@@ -1,6 +1,8 @@
-body {
+#body-container {
     font: 10px sans-serif;
-    margin: 0;
+    margin: 0px auto 22px;
+    clear: both;
+    width: 960px;
 }
 
 .view, .summary {
@@ -62,4 +64,12 @@ path.area {
 .slider rect.handle {
     cursor: pointer;
     fill: #eee;
+}
+
+.slider line.odd {
+    stroke: #fff;
+}
+
+.slider line.even {
+    stroke: #000;
 }

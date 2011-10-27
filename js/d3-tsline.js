@@ -17,19 +17,22 @@ function d3_tsline() {
     self.width = 960;
     self.height = 400;
     self.summary_height = 50;
+    self.handle_height = 14;
     self.view_span = 90; // view_span (in data points)
     self.parse = d3.time.format("%b %d, %Y").parse;
 
-    // internal
+    // slider dimensions (in px)
     self.slider = {
         x: 729,
         w: 171,
         max_x: 729
     };
+
     // TODO: change 20 below to y axis 'width' (see draw_view above)
     var lm =  self.margins[1] + 20; // left margin, including y axis
 
     self.draw_chart = function(data) {
+        self.data = data;
         self.build_dom();
 
         // calcs for view window and slider
@@ -92,8 +95,11 @@ function d3_tsline() {
         x.domain([values[0].date, values[values.length - 1].date]);
         y.domain([0, d3.max(values, function(d) { return d.val; })]).nice();
 
+        var view = d3.select(this.selector + " .view");
+        view.html(""); // clear everything out of container
+
         // Add an SVG element with the desired dimensions and margin.
-        var svg = d3.select(this.selector + " .view").append("svg:svg")
+        var svg = view.append("svg:svg")
             .attr("width", w + m[1] + m[3])
             .attr("height", h + m[0] + m[2])
             .append("svg:g")
@@ -248,7 +254,26 @@ function d3_tsline() {
             .attr("x", 0)
             .attr("y", self.summary_height + 1)
             .attr("width", self.slider.w)
-            .attr("height", 14);
+            .attr("height", self.handle_height);
+
+        // raised ridges
+        var rt = Math.round(self.handle_height / 2) - 3 + self.summary_height;
+        var rl = Math.round(self.slider.w / 2) - 4;
+        for( var i=0; i < 4; i++ ) {
+            slider.append("svg:line")
+                .attr("class", "handle-ridges odd")
+                .attr("y1", rt)
+                .attr("y2", rt + 5)
+                .attr("x1", rl + (i*2))
+                .attr("x2", rl + (i*2));
+
+            slider.append("svg:line")
+                .attr("class", "handle-ridges even")
+                .attr("y1", rt + 1)
+                .attr("y2", rt + 6)
+                .attr("x1", rl + (i*2) + 1)
+                .attr("x2", rl + (i*2) + 1);
+        }
 
         slider
             .call(d3.behavior.drag()
@@ -272,10 +297,15 @@ function d3_tsline() {
         if( self.slider.x < 0 ) self.slider.x = 0;
         if( self.slider.x > self.slider.max_x )
             self.slider.x = self.slider.max_x;
-        console.log(this.slider.x);
         d3.select(this.selector + " .slider")
             .attr("transform", "translate(" + self.slider.x + ")")
-        // this.redraw();
+        self.redraw_view();
+    };
+
+    self.redraw_view = function() {
+        var max_elem = self.data.length - self.view_span;
+        var start = Math.round(self.slider.x * (max_elem / self.slider.max_x));
+        self.draw_view( self.data.slice(start, start + self.view_span) );
     };
 
 };
