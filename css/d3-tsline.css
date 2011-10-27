@@ -25,9 +25,8 @@ path.area {
     shape-rendering: crispEdges;
 }
 
-.x.axis line {
-    display: none;
-    stroke: #fff;
+line.tick {
+    stroke: #eee;
 }
 
 .x.axis .minor {
@@ -38,7 +37,7 @@ path.area {
     display: none;
 }
 
-.y.axis line, .y.axis path, rect.border {
+.y.axis path, rect.border {
     fill: none;
     stroke: #000;
     stroke-width: 1px;

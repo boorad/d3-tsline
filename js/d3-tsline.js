@@ -18,7 +18,7 @@ function d3_tsline() {
     self.height = 400;
     self.summary_height = 50;
     self.handle_height = 14;
-    self.view_span = 90; // view_span (in data points)
+    self.view_span = 64; // view_span (in data points)
     self.parse = d3.time.format("%b %d, %Y").parse;
 
     // slider dimensions (in px)
@@ -75,8 +75,9 @@ function d3_tsline() {
         // Scales and axes. inverted domain for the y-scale: bigger is up!
         var x = d3.time.scale().range([m[1]+1, w]),
             y = d3.scale.linear().range([h, 0]),
-            xAxis = d3.svg.axis().scale(x).tickSize(-h).tickSubdivide(true),
-            yAxis = d3.svg.axis().scale(y).ticks(4).orient("left");
+            xAxis = d3.svg.axis().scale(x).tickSize(-h).tickSubdivide(false),
+            yAxis = d3.svg.axis().scale(y).ticks(6).tickSize(-w + 20)
+                .orient("left");
 
         // An area generator, for the light fill.
         var area = d3.svg.area()
@@ -93,7 +94,8 @@ function d3_tsline() {
 
         // Compute the minimum and maximum date, and the maximum val.
         x.domain([values[0].date, values[values.length - 1].date]);
-        y.domain([0, d3.max(values, function(d) { return d.val; })]).nice();
+        y.domain([d3.min(values, function(d) { return d.val; }),
+                  d3.max(values, function(d) { return d.val; })]).nice();
 
         var view = d3.select(this.selector + " .view");
         view.html(""); // clear everything out of container
