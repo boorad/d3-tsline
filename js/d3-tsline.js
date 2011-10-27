@@ -12,34 +12,36 @@ function d3_tsline() {
     var self = this;
 
     // TODO: expose these
-    this.selector = "#chart";
-    this.margins = [20, 20, 20, 20]; // top, left, bottom, right (margins)
-    this.width = 960;
-    this.height = 400;
-    this.summary_height = 50;
-    this.view_span = 90; // view_span (in data points)
-    this.parse = d3.time.format("%b %d, %Y").parse;
+    self.selector = "#chart";
+    self.margins = [20, 20, 20, 20]; // top, left, bottom, right (margins)
+    self.width = 960;
+    self.height = 400;
+    self.summary_height = 50;
+    self.view_span = 90; // view_span (in data points)
+    self.parse = d3.time.format("%b %d, %Y").parse;
 
     // internal
-    var init_max_x = self.width - 90 - self.margins[1] - self.margins[3] - 20;
-    // TODO: the 90's above is slider width, hook to view_span
-    // TODO: 20 above is y axis width
-
-    this.slider = {
-        x: init_max_x,
-        w: 90, // TODO: hook to view_span, which is in data points
-        max_x: init_max_x
-        // TODO: max_x is gonna need to be in redraw()
+    self.slider = {
+        x: 729,
+        w: 171,
+        max_x: 729
     };
+    // TODO: change 20 below to y axis 'width' (see draw_view above)
+    var lm =  self.margins[1] + 20; // left margin, including y axis
 
-    this.draw_chart = function(data) {
-        this.build_dom();
+    self.draw_chart = function(data) {
+        self.build_dom();
+
+        // calcs for view window and slider
         view_end = data.length - 1;
         view_start = (view_end - this.view_span < 0)
             ? 0 : view_end - this.view_span;
+        self.slider.w = Math.round(self.width * (self.view_span / data.length));
+        self.slider.x = self.slider.max_x = self.width - self.slider.w -
+            self.margins[1] - self.margins[3] - 20;
 
         // Parse dates and numbers. We assume values are sorted by date.
-        var parse = this.parse;
+        var parse = self.parse;
         data.forEach(function(d) {
             d.date = parse(d.date);
             d.val = +d.val;
@@ -48,11 +50,11 @@ function d3_tsline() {
         // make view window slice data
         var view = data.slice(view_start, view_end);
 
-        this.draw_view(view);
-        this.draw_summary(data);
+        self.draw_view(view);
+        self.draw_summary(data);
     };
 
-    this.build_dom = function() {
+    self.build_dom = function() {
         d3.select(this.selector)
             .append("div")
             .attr("class", "view");
@@ -61,11 +63,11 @@ function d3_tsline() {
             .attr("class", "summary");
     };
 
-    this.draw_view = function(values) {
+    self.draw_view = function(values) {
 
-        var m = this.margins,
-            w = this.width - m[1] - m[3],
-            h = this.height - m[0] - m[2];
+        var m = self.margins,
+            w = self.width - m[1] - m[3],
+            h = self.height - m[0] - m[2];
 
         // Scales and axes. inverted domain for the y-scale: bigger is up!
         var x = d3.time.scale().range([m[1]+1, w]),
@@ -139,11 +141,11 @@ function d3_tsline() {
 
     };
 
-    this.draw_summary = function(values) {
+    self.draw_summary = function(values) {
 
-        var m = this.margins,
-            w = this.width - m[1] - m[3],
-            h = this.summary_height;
+        var m = self.margins,
+            w = self.width - m[1] - m[3],
+            h = self.summary_height;
         m[0] = 5; // top margin doesn't need to be huge
 
         // Scales and axes. inverted domain for the y-scale: bigger is up!
@@ -151,9 +153,6 @@ function d3_tsline() {
             y = d3.scale.linear().range([h, 0]),
             xAxis = d3.svg.axis().scale(x).tickSize(-h).tickSubdivide(true),
             yAxis = d3.svg.axis().scale(y).ticks(4).orient("left");
-
-        // TODO: change 20 below to y axis 'width' (see draw_view above)
-        var lm =  m[1] + 20; // left margin, including y axis
 
         // An area generator, for the light fill.
         var area = d3.svg.area()
@@ -173,7 +172,7 @@ function d3_tsline() {
         y.domain([0, d3.max(values, function(d) { return d.val; })]).nice();
 
         // Add an SVG element with the desired dimensions and margin.
-        var svg = d3.select(this.selector + " .summary").append("svg:svg")
+        var svg = d3.select(self.selector + " .summary").append("svg:svg")
             .attr("width", w + m[1] + m[3])
             .attr("height", h + m[2]);
         var g = svg.append("svg:g")
@@ -214,8 +213,14 @@ function d3_tsline() {
             .attr("clip-path", "url(#clip)")
             .attr("d", line(values));
 
+        self.draw_slider(svg);
 
-        // TODO: separate function
+    };
+
+    self.draw_slider = function(svg) {
+
+        var m = self.margins;
+
         // make the slider
         var slider = svg.append("svg:g")
             .attr("transform",
@@ -223,28 +228,26 @@ function d3_tsline() {
             .append("svg:g")
             .attr("class", "slider")
             .attr("transform",
-                  "translate(" + this.slider.x + ")");
-            //.attr("width", w + m[1] + m[3])
-            //.attr("height", h + m[2])
+                  "translate(" + self.slider.x + ")");
 
         slider.append("svg:rect") // slider border
             .attr("x", 0)
             .attr("y", 0 - m[0] + 1)
-            .attr("width", this.slider.w)
-            .attr("height", h + m[0]);
+            .attr("width", self.slider.w)
+            .attr("height", self.summary_height + m[0]);
 
         slider.append("svg:line") // slider top border
             .attr("class", "slider-top-border")
             .attr("y1", -1 * m[0] + 1)
             .attr("y2", -1 * m[0] + 1)
             .attr("x1", 1 )
-            .attr("x2", this.slider.w );
+            .attr("x2", self.slider.w );
 
-        slider.append("svg:rect")
+        slider.append("svg:rect") // bottom handle
             .attr("class", "handle bottom")
             .attr("x", 0)
-            .attr("y", h + 1)
-            .attr("width", this.slider.w)
+            .attr("y", self.summary_height + 1)
+            .attr("width", self.slider.w)
             .attr("height", 14);
 
         slider
@@ -264,14 +267,14 @@ function d3_tsline() {
 
     };
 
-    this.move_slider = function(origin, dx) {
-        this.slider.x = origin + dx;
-        if( this.slider.x < 0 ) this.slider.x = 0;
-        if( this.slider.x > this.slider.max_x )
-            this.slider.x = this.slider.max_x;
-        //console.log(this.slider.x);
+    self.move_slider = function(origin, dx) {
+        self.slider.x = origin + dx;
+        if( self.slider.x < 0 ) self.slider.x = 0;
+        if( self.slider.x > self.slider.max_x )
+            self.slider.x = self.slider.max_x;
+        console.log(this.slider.x);
         d3.select(this.selector + " .slider")
-            .attr("transform", "translate(" + this.slider.x + ")")
+            .attr("transform", "translate(" + self.slider.x + ")")
         // this.redraw();
     };
 
