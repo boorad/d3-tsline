@@ -43,7 +43,7 @@ line.tick {
     stroke-width: 1px;
 }
 
-.summary .border {
+.summary rect.border {
     stroke: #ddd;
 }
 
@@ -65,10 +65,24 @@ line.tick {
     fill: #eee;
 }
 
+.slider .handle-ridges {
+    cursor: pointer;
+}
+
 .slider line.odd {
     stroke: #fff;
 }
 
 .slider line.even {
     stroke: #000;
+}
+
+.slider rect.sizer {
+    shape-rendering: auto;
+    fill: #eee;
+}
+
+.slider rect.sizer:hover {
+    fill: #ccc;
+    cursor: col-resize;
 }

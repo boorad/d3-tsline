@@ -228,6 +228,8 @@ function d3_tsline() {
     self.draw_slider = function(svg) {
 
         var m = self.margins;
+        var sizer_w = 9,
+            sizer_h = Math.round(self.summary_height / 3);
 
         // make the slider
         var slider = svg.append("svg:g")
@@ -238,20 +240,56 @@ function d3_tsline() {
             .attr("transform",
                   "translate(" + self.slider.x + ")");
 
-        slider.append("svg:rect") // slider border
-            .attr("x", 0)
-            .attr("y", 0 - m[0] + 1)
-            .attr("width", self.slider.w)
-            .attr("height", self.summary_height + m[0]);
+        // left border and sizer
+        var left = slider.append("svg:g")
+            .attr("class", "left");
 
-        slider.append("svg:line") // slider top border
+        left.append("svg:line")
+            .attr("y1", 0 - m[0] + 1)
+            .attr("y2", self.summary_height + m[0])
+            .attr("x1", 0)
+            .attr("x2", 0)
+            .attr("class", "border");
+
+        left.append("svg:rect")
+            .attr("class", "sizer")
+            .attr("x", -4)
+            .attr("y", Math.round(self.summary_height/2)-Math.round(sizer_h/2))
+            .attr("width", sizer_w)
+            .attr("height", sizer_h)
+            .attr("rx", 2)
+            .attr("ry", 2)
+
+        // right border and sizer
+        var right = slider.append("svg:g")
+            .attr("class", "right");
+
+        right.append("svg:line") // summary right border
+            .attr("y1", 0 - m[0] + 1)
+            .attr("y2", self.summary_height + m[0])
+            .attr("x1", self.slider.w)
+            .attr("x2", self.slider.w)
+            .attr("class", "border");
+
+        right.append("svg:rect")
+            .attr("class", "sizer")
+            .attr("x", self.slider.w-4)
+            .attr("y", Math.round(self.summary_height/2)-Math.round(sizer_h/2))
+            .attr("width", sizer_w)
+            .attr("height", sizer_h)
+            .attr("rx", 2)
+            .attr("ry", 2)
+
+        // slider top 'clear'  border
+        slider.append("svg:line")
             .attr("class", "slider-top-border")
             .attr("y1", -1 * m[0] + 1)
             .attr("y2", -1 * m[0] + 1)
-            .attr("x1", 1 )
-            .attr("x2", self.slider.w );
+            .attr("x1", 1)
+            .attr("x2", self.slider.w);
 
-        slider.append("svg:rect") // bottom handle
+        // bottom handle
+        var handle = slider.append("svg:rect")
             .attr("class", "handle bottom")
             .attr("x", 0)
             .attr("y", self.summary_height + 1)
@@ -277,8 +315,7 @@ function d3_tsline() {
                 .attr("x2", rl + (i*2) + 1);
         }
 
-        slider
-            .call(d3.behavior.drag()
+        slider.call(d3.behavior.drag()
                   .on("dragstart", function(d) {
                       this.__origin__ = self.slider.x;
                       this.__offset__ = 0;
