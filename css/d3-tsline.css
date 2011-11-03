@@ -77,12 +77,17 @@ line.tick {
     stroke: #000;
 }
 
-.slider rect.sizer {
-    shape-rendering: auto;
-    fill: #eee;
+.slider_container line.border {
+    stroke: #000;
 }
 
-.slider rect.sizer:hover {
+.slider_container rect.sizer {
+    shape-rendering: auto;
+    fill: #eee;
+    stroke: #000;
+}
+
+.slider_container rect.sizer:hover {
     fill: #ccc;
     cursor: col-resize;
 }

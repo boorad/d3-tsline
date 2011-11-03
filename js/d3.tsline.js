@@ -20,6 +20,7 @@ function d3_tsline() {
     self.handle_height = 14;
     self.view_span = 64; // view_span (in data points)
     self.parse = d3.time.format("%b %d, %Y").parse;
+    self.yaxis_w = 20;  // TODO fix this hack-ass shit, detect width
 
     // slider dimensions (in px)
     self.slider = {
@@ -27,9 +28,6 @@ function d3_tsline() {
         w: 171,
         max_x: 729
     };
-
-    // TODO: change 20 below to y axis 'width' (see draw_view above)
-    var lm =  self.margins[1] + 20; // left margin, including y axis
 
     self.draw_chart = function(data) {
         self.data = data;
@@ -231,17 +229,23 @@ function d3_tsline() {
         var sizer_w = 9,
             sizer_h = Math.round(self.summary_height / 3);
 
-        // make the slider
-        var slider = svg.append("svg:g")
+        // slider_container
+        var slider_container = svg.append("svg:g")
             .attr("transform",
-                  "translate(" + lm + "," + m[0] + ")")
+                  "translate(" + (m[1] + self.yaxis_w) + "," + m[0] + ")")
             .append("svg:g")
-            .attr("class", "slider")
+            .attr("class", "slider_container")
             .attr("transform",
                   "translate(" + self.slider.x + ")");
 
+        // slider
+        var slider = svg.append("svg:g")
+            .attr("class", "slider")
+            .attr("transform",
+                  "translate(" + (self.slider.x + m[1] + self.yaxis_w) + ")");
+
         // left border and sizer
-        var left = slider.append("svg:g")
+        var left = slider_container.append("svg:g")
             .attr("class", "left");
 
         left.append("svg:line")
@@ -261,7 +265,7 @@ function d3_tsline() {
             .attr("ry", 2)
 
         // right border and sizer
-        var right = slider.append("svg:g")
+        var right = slider_container.append("svg:g")
             .attr("class", "right");
 
         right.append("svg:line") // summary right border
@@ -281,7 +285,7 @@ function d3_tsline() {
             .attr("ry", 2)
 
         // slider top 'clear'  border
-        slider.append("svg:line")
+        slider_container.append("svg:line")
             .attr("class", "slider-top-border")
             .attr("y1", -1 * m[0] + 1)
             .attr("y2", -1 * m[0] + 1)
@@ -336,8 +340,11 @@ function d3_tsline() {
         if( self.slider.x < 0 ) self.slider.x = 0;
         if( self.slider.x > self.slider.max_x )
             self.slider.x = self.slider.max_x;
-        d3.select(this.selector + " .slider")
+        d3.select(this.selector + " .slider_container")
             .attr("transform", "translate(" + self.slider.x + ")")
+        var slider_new_x = self.slider.x + self.margins[1] + self.yaxis_w;
+        d3.select(this.selector + " .slider")
+            .attr("transform", "translate(" + slider_new_x + ")")
         self.redraw_view();
     };
 
