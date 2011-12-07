@@ -343,10 +343,11 @@ function d3_tsline() {
                       delete this.__offset__;
                   }));
 
-        // TODO: consolidate left/right drag spec
-        left.call(d3.behavior.drag()
+        // dragging on left/right sizers
+        var sizer_spec = d3.behavior.drag()
                   .on("dragstart", function(d) {
-                      this.__origin__ = self.left.x;
+                      var clazz = this.className.baseVal;
+                      this.__origin__ = self[clazz].x;
                       this.__offset__ = 0;
                   })
                   .on("drag", function(d) {
@@ -356,23 +357,10 @@ function d3_tsline() {
                   .on("dragend", function() {
                       delete this.__origin__;
                       delete this.__offset__;
-                      console.log("sizer end");
-                  }));
-
-        right.call(d3.behavior.drag()
-                  .on("dragstart", function(d) {
-                      this.__origin__ = self.right.x;
-                      this.__offset__ = 0;
-                  })
-                  .on("drag", function(d) {
-                      this.__offset__ += d3.event.dx;
-                      self.move_sizer(this);
-                  })
-                  .on("dragend", function() {
-                      delete this.__origin__;
-                      delete this.__offset__;
-                      console.log("sizer end");
-                  }));
+                      self.sizer_end(this);
+                  });
+        left.call(sizer_spec);
+        right.call(sizer_spec);
 
     };
 
@@ -395,6 +383,11 @@ function d3_tsline() {
         var sizer_new_x = self[clazz].x;
         d3.select(this.selector + " ." + clazz)
             .attr("transform", "translate(" + sizer_new_x + ")")
+    };
+
+    self.sizer_end = function(sizer) {
+        var clazz = sizer.className.baseVal;
+        self[clazz].x
     };
 
     self.redraw_view = function() {
