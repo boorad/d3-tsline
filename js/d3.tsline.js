@@ -29,6 +29,14 @@ function d3_tsline() {
         max_x: 729
     };
 
+    self.left = {
+        x: 0
+    };
+
+    self.right = {
+        x: 0
+    };
+
     self.draw_chart = function(data) {
         self.data = data;
         self.build_dom();
@@ -250,7 +258,7 @@ function d3_tsline() {
 
         left.append("svg:line")
             .attr("y1", 0 - m[0] + 1)
-            .attr("y2", self.summary_height + m[0])
+            .attr("y2", self.summary_height)
             .attr("x1", 0)
             .attr("x2", 0)
             .attr("class", "border");
@@ -270,7 +278,7 @@ function d3_tsline() {
 
         right.append("svg:line") // summary right border
             .attr("y1", 0 - m[0] + 1)
-            .attr("y2", self.summary_height + m[0])
+            .attr("y2", self.summary_height)
             .attr("x1", self.slider.w)
             .attr("x2", self.slider.w)
             .attr("class", "border");
@@ -296,12 +304,13 @@ function d3_tsline() {
         var handle = slider.append("svg:rect")
             .attr("class", "handle bottom")
             .attr("x", 0)
-            .attr("y", self.summary_height + 1)
+            .attr("y", self.summary_height + m[0] + 1)
             .attr("width", self.slider.w)
             .attr("height", self.handle_height);
 
         // raised ridges
-        var rt = Math.round(self.handle_height / 2) - 3 + self.summary_height;
+        var rt = Math.round(self.handle_height / 2) - 3 +
+            self.summary_height + m[0];
         var rl = Math.round(self.slider.w / 2) - 4;
         for( var i=0; i < 4; i++ ) {
             slider.append("svg:line")
@@ -319,6 +328,7 @@ function d3_tsline() {
                 .attr("x2", rl + (i*2) + 1);
         }
 
+        // dragging
         slider.call(d3.behavior.drag()
                   .on("dragstart", function(d) {
                       this.__origin__ = self.slider.x;
@@ -331,6 +341,37 @@ function d3_tsline() {
                   .on("dragend", function() {
                       delete this.__origin__;
                       delete this.__offset__;
+                  }));
+
+        // TODO: consolidate left/right drag spec
+        left.call(d3.behavior.drag()
+                  .on("dragstart", function(d) {
+                      this.__origin__ = self.left.x;
+                      this.__offset__ = 0;
+                  })
+                  .on("drag", function(d) {
+                      this.__offset__ += d3.event.dx;
+                      self.move_sizer(this);
+                  })
+                  .on("dragend", function() {
+                      delete this.__origin__;
+                      delete this.__offset__;
+                      console.log("sizer end");
+                  }));
+
+        right.call(d3.behavior.drag()
+                  .on("dragstart", function(d) {
+                      this.__origin__ = self.right.x;
+                      this.__offset__ = 0;
+                  })
+                  .on("drag", function(d) {
+                      this.__offset__ += d3.event.dx;
+                      self.move_sizer(this);
+                  })
+                  .on("dragend", function() {
+                      delete this.__origin__;
+                      delete this.__offset__;
+                      console.log("sizer end");
                   }));
 
     };
@@ -346,6 +387,14 @@ function d3_tsline() {
         d3.select(this.selector + " .slider")
             .attr("transform", "translate(" + slider_new_x + ")")
         self.redraw_view();
+    };
+
+    self.move_sizer = function(sizer) {
+        var clazz = sizer.className.baseVal;
+        self[clazz].x = sizer.__origin__ + sizer.__offset__;
+        var sizer_new_x = self[clazz].x;
+        d3.select(this.selector + " ." + clazz)
+            .attr("transform", "translate(" + sizer_new_x + ")")
     };
 
     self.redraw_view = function() {
