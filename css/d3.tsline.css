@@ -1,10 +1,3 @@
-#body-container {
-    font: 10px sans-serif;
-    margin: 0px auto 22px;
-    clear: both;
-    width: 960px;
-}
-
 .view, .summary {
     shape-rendering: crispEdges;
 }

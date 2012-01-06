@@ -61,6 +61,7 @@ function d3_tsline(id) {
     self.draw_chart = function() {
 
         if( !self.is_valid( self.series ) ) return;
+        self.data = self.format_data(self.data);
 
         // calcs for view window and slider
         view_end = self.data[0].length - 1 || 0;
@@ -80,14 +81,14 @@ function d3_tsline(id) {
         });
 
         // make view window slice data arrays (one per series)
-        var views = [];
+        var view_data = [];
         self.data.forEach(function(series) {
-            views.push( series.slice(view_start, view_end+1) );
+            view_data.push( series.slice(view_start, view_end+1) );
         });
 
         self.discover_range();
-        self.draw_view(views);
-        self.draw_summary(self.data);
+        self.draw_view(view_data);
+        //self.draw_summary(self.data);
     };
 
     self.is_valid = function(arr) {
@@ -142,17 +143,17 @@ function d3_tsline(id) {
 
     // Scales and axes. inverted domain for the y-scale: bigger is up!
     self.discover_range = function() {
-        var domain = this.domain();
+        var domain = self.domain();
 
         self.x = function(w) {
             return d3.time.scale()
-                .domain(domain.x)
-                .range([self.margins[1]+1, w]);
+                .range([self.margins[1], w])
+                .domain(domain.x);
         };
         self.y = function(h) {
             return d3.scale.linear()
-                .domain(domain.y)
-                .range([h, 0]);
+                .range([h, 0])
+                .domain(domain.y);
         };
         self.xAxis = function(w,h) {
             var x = self.x(w);
@@ -176,17 +177,20 @@ function d3_tsline(id) {
 	var values = [];
         var data = self.data;
 
+        // get all y values from all series
 	data.forEach( function(series) {
 	    series.forEach( function(d) {
 		values.push( d[1] );
 	    } );
 	} );
 
-	var xMin = data[0][0][0];
-	var xMax = data[0][ data[0].length - 1 ][0];
+        // get x min/max from the first series only
+        var first = data[0];
+	var xMin = first[0][0];
+	var xMax = first[ first.length - 1 ][0];
 
-	var yMin = d3.min( values );
-	var yMax = d3.max( values );
+	var yMin = d3.min( values ) - 2;
+	var yMax = d3.max( values ) + 2;
 
 	return { x: [xMin, xMax], y: [yMin, yMax] };
     };
@@ -220,23 +224,6 @@ function d3_tsline(id) {
             .attr("width", w)
             .attr("height", h);
 
-        // Add the line paths (one per series)
-        var paths = svg.selectAll("path")
-            .data(self.data)
-            .enter().append("svg:path")
-            .attr("d", self.linemaker(w,h))
-            .attr("class", "line")
-            .attr("clip-path", "url(#clip)");
-
-        console.log("paths", paths);
-
-        var i=0;
-        self.series.forEach( function(series) {
-            series.path = paths[0][i++];
-            var clazz = series.path.getAttribute("class");
-            series.path.setAttribute("class", clazz + " " + series.css);
-        });
-
         // Add the x-axis.
         svg.append("svg:g")
             .attr("class", "x axis")
@@ -256,6 +243,21 @@ function d3_tsline(id) {
             .attr("class", "y axis")
             .attr("transform", "translate(" + m[1] + ",0)")
             .call(yAxis);
+
+        // Add the line paths (one per series)
+        var paths = svg.selectAll("path")
+            .data(self.data)
+            .enter().append("svg:path")
+            .attr("d", self.linemaker(w,h))
+            .attr("class", "line")
+            .attr("clip-path", "url(#clip)");
+
+        var i=0;
+        self.series.forEach( function(series) {
+            series.path = paths[0][i++];
+            var clazz = series.path.getAttribute("class");
+            series.path.setAttribute("class", clazz + " " + series.css);
+        });
 
     };
 
