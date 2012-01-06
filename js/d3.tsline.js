@@ -2,21 +2,23 @@
 
 function d3_tsline(id) {
 
-
-function d3_tsline() {
-
     var self = this;
 
-    // TODO: expose these
-    self.selector = "#chart";
-    self.margins = [20, 20, 20, 20]; // top, left, bottom, right (margins)
+    self.selector = id || "#chart";
+
+    self.series = []; // series metadata
+    self.data = [];   // series data
+
     self.width = 960;
     self.height = 400;
+    self.margins = [20, 20, 20, 20]; // top, left, bottom, right (margins)
     self.summary_height = 50;
     self.handle_height = 14;
     self.view_span = 64; // view_span (in data points)
-    self.parse = d3.time.format("%b %d, %Y").parse;
     self.yaxis_w = 20;  // TODO fix this hack-ass shit, detect width
+
+    self.interpolation = 'cardinal';
+    self.tension = 0.8;
 
     // slider dimensions (in px)
     self.slider = {
@@ -25,6 +27,7 @@ function d3_tsline() {
         max_x: 729
     };
 
+    // sizer values
     self.left = {
         x: 0
     };
@@ -33,30 +36,64 @@ function d3_tsline() {
         x: 0
     };
 
-    self.draw_chart = function(data) {
-        self.data = data;
+    //
+    // functions
+    //
+
+    // ctor, called upon instantiation
+    self.init = function() {
         self.build_dom();
+    };
+
+    // override this to shape your data to what d3-tsline wants
+    // which is [ series, series, ... ]
+    // and a series is: [ [epoch, value], [epoch, value], ... ]
+    self.format_data = function(data) {
+        // this default implementation assumes data is in proper format already
+        return data;
+    };
+
+    self.parse_date = function(dt) { return dt; }; // js Date object
+    //self.parse_date = function(dt) { return new Date(dt*1000); }; // epoch
+    //self.parse_date = d3.time.format("%b %d, %Y").parse; // mon d, yyyy
+    self.parse_val = function(val) { return val; };
+
+    self.draw_chart = function() {
+
+        if( !self.is_valid( self.series ) ) return;
 
         // calcs for view window and slider
-        view_end = data.length - 1;
-        view_start = (view_end - this.view_span < 0)
+        view_end = self.data[0].length - 1 || 0;
+        view_start = ((view_end - this.view_span) < 0)
             ? 0 : view_end - this.view_span;
-        self.slider.w = Math.round(self.width * (self.view_span / data.length));
+        self.slider.w = Math.round(self.width *
+                                   (self.view_span / self.data[0].length));
         self.slider.x = self.slider.max_x = self.width - self.slider.w -
             self.margins[1] - self.margins[3] - 20;
 
         // Parse dates and numbers. We assume values are sorted by date.
-        var parse = self.parse;
-        data.forEach(function(d) {
-            d.date = parse(d.date);
-            d.val = +d.val;
+        self.data.forEach(function(series) {
+            series.forEach(function(d) {
+                d[0] = self.parse_date(d[0]);
+                d[1] = self.parse_val(d[1]);
+            });
         });
 
-        // make view window slice data
-        var view = data.slice(view_start, view_end);
+        // make view window slice data arrays (one per series)
+        var views = [];
+        self.data.forEach(function(series) {
+            views.push( series.slice(view_start, view_end+1) );
+        });
 
-        self.draw_view(view);
-        self.draw_summary(data);
+        self.discover_range();
+        self.draw_view(views);
+        self.draw_summary(self.data);
+    };
+
+    self.is_valid = function(arr) {
+        if( arr == null ) return false;
+        if( arr.length == 0 ) return false;
+        return true;
     };
 
     self.build_dom = function() {
@@ -68,36 +105,103 @@ function d3_tsline() {
             .attr("class", "summary");
     };
 
+    // if we have fewer data points than self.view_span, fill in pts to left
+    // so the chart seems to start from the right and scroll left
+    self.fill_left_pts = function(interval, fill_value) {
+        var len = self.data[0].length;
+        var min_x = self.data[0][0][0].valueOf();
+        for( var i = min_x - 1;
+             i > (min_x - (self.view_span - len) - 1);
+             i = i - interval ) {
+            self.data.forEach(function(series) {
+                series.unshift([i,fill_value || null]);
+            });
+        }
+    };
+
+    // An area generator, for the light fill.
+    self.areamaker = function(w,h) {
+        var x = self.x(w);
+        var y = self.y(h);
+        return d3.svg.area()
+            .x(function(d) { return x(d[0]); })
+            .y0(h)
+            .y1(function(d) { return y(d[1]); })
+            .interpolate(self.interpolation).tension(self.tension);
+    };
+
+    // A line generator, for the dark stroke.
+    self.linemaker = function(w,h) {
+        var x = self.x(w);
+        var y = self.y(h);
+        return d3.svg.line()
+            .x( function(d) { return x(d[0]) })
+            .y( function(d) { return y(d[1]) })
+            .interpolate(self.interpolation).tension(self.tension);
+    };
+
+    // Scales and axes. inverted domain for the y-scale: bigger is up!
+    self.discover_range = function() {
+        var domain = this.domain();
+
+        self.x = function(w) {
+            return d3.time.scale()
+                .domain(domain.x)
+                .range([self.margins[1]+1, w]);
+        };
+        self.y = function(h) {
+            return d3.scale.linear()
+                .domain(domain.y)
+                .range([h, 0]);
+        };
+        self.xAxis = function(w,h) {
+            var x = self.x(w);
+            return d3.svg.axis()
+                .scale(x)
+                .tickSize(-1 * h)
+                .tickSubdivide(false);
+        };
+        self.yAxis = function(w,h) {
+            var y = self.y(h);
+            return d3.svg.axis()
+                .scale(y)
+                .ticks(6)
+                .tickSize(-1 * w + 20)
+                .orient("left");
+        };
+    };
+
+    self.domain = function() {
+
+	var values = [];
+        var data = self.data;
+
+	data.forEach( function(series) {
+	    series.forEach( function(d) {
+		values.push( d[1] );
+	    } );
+	} );
+
+	var xMin = data[0][0][0];
+	var xMax = data[0][ data[0].length - 1 ][0];
+
+	var yMin = d3.min( values );
+	var yMax = d3.max( values );
+
+	return { x: [xMin, xMax], y: [yMin, yMax] };
+    };
+
+
+    // draw the top view pane
     self.draw_view = function(values) {
 
-        var m = self.margins,
-            w = self.width - m[1] - m[3],
-            h = self.height - m[0] - m[2];
+        var m = self.margins;
+        var w = self.width - m[1] - m[3];
+        var h = self.height - m[0] - m[2];
 
-        // Scales and axes. inverted domain for the y-scale: bigger is up!
-        var x = d3.time.scale().range([m[1]+1, w]),
-            y = d3.scale.linear().range([h, 0]),
-            xAxis = d3.svg.axis().scale(x).tickSize(-h).tickSubdivide(false),
-            yAxis = d3.svg.axis().scale(y).ticks(6).tickSize(-w + 20)
-                .orient("left");
-
-        // An area generator, for the light fill.
-        var area = d3.svg.area()
-            .interpolate("monotone")
-            .x(function(d) { return x(d.date); })
-            .y0(h)
-            .y1(function(d) { return y(d.val); });
-
-        // A line generator, for the dark stroke.
-        var line = d3.svg.line()
-            .interpolate("monotone")
-            .x(function(d) { return x(d.date); })
-            .y(function(d) { return y(d.val); });
-
-        // Compute the minimum and maximum date, and the maximum val.
-        x.domain([values[0].date, values[values.length - 1].date]);
-        y.domain([d3.min(values, function(d) { return d.val; }),
-                  d3.max(values, function(d) { return d.val; })]).nice();
+        // axis vars
+        var xAxis = self.xAxis(w,h);
+        var yAxis = self.yAxis(w,h);
 
         var view = d3.select(this.selector + " .view");
         view.html(""); // clear everything out of container
@@ -116,11 +220,22 @@ function d3_tsline() {
             .attr("width", w)
             .attr("height", h);
 
-        // Add the area path.
-        svg.append("svg:path")
-            .attr("class", "area")
-            .attr("clip-path", "url(#clip)")
-            .attr("d", area(values));
+        // Add the line paths (one per series)
+        var paths = svg.selectAll("path")
+            .data(self.data)
+            .enter().append("svg:path")
+            .attr("d", self.linemaker(w,h))
+            .attr("class", "line")
+            .attr("clip-path", "url(#clip)");
+
+        console.log("paths", paths);
+
+        var i=0;
+        self.series.forEach( function(series) {
+            series.path = paths[0][i++];
+            var clazz = series.path.getAttribute("class");
+            series.path.setAttribute("class", clazz + " " + series.css);
+        });
 
         // Add the x-axis.
         svg.append("svg:g")
@@ -142,13 +257,6 @@ function d3_tsline() {
             .attr("transform", "translate(" + m[1] + ",0)")
             .call(yAxis);
 
-        // Add the line path.
-        svg.append("svg:path")
-            .attr("class", "line")
-            .attr("clip-path", "url(#clip)")
-            .attr("d", line(values));
-
-
     };
 
     self.draw_summary = function(values) {
@@ -157,29 +265,6 @@ function d3_tsline() {
             w = self.width - m[1] - m[3],
             h = self.summary_height;
         m[0] = 5; // top margin doesn't need to be huge
-
-        // Scales and axes. inverted domain for the y-scale: bigger is up!
-        var x = d3.time.scale().range([m[1]+1, w]),
-            y = d3.scale.linear().range([h, 0]),
-            xAxis = d3.svg.axis().scale(x).tickSize(-h).tickSubdivide(true),
-            yAxis = d3.svg.axis().scale(y).ticks(4).orient("left");
-
-        // An area generator, for the light fill.
-        var area = d3.svg.area()
-            .interpolate("monotone")
-            .x(function(d) { return x(d.date); })
-            .y0(h)
-            .y1(function(d) { return y(d.val); });
-
-        // A line generator, for the dark stroke.
-        var line = d3.svg.line()
-            .interpolate("monotone")
-            .x(function(d) { return x(d.date); })
-            .y(function(d) { return y(d.val); });
-
-        // Compute the minimum and maximum date, and the maximum val.
-        x.domain([values[0].date, values[values.length - 1].date]);
-        y.domain([0, d3.max(values, function(d) { return d.val; })]).nice();
 
         // Add an SVG element with the desired dimensions and margin.
         var svg = d3.select(self.selector + " .summary").append("svg:svg")
@@ -190,16 +275,10 @@ function d3_tsline() {
 
         // Add the clip path.
         g.append("svg:clipPath")
-            .attr("id", "clip")
+            .attr("id", "summary-clip")
             .append("svg:rect")
             .attr("width", w)
             .attr("height", h);
-
-        // Add the area path.
-        g.append("svg:path")
-            .attr("class", "area")
-            .attr("clip-path", "url(#clip)")
-            .attr("d", area(values));
 
         // Add the border.
         g.append("svg:rect")
@@ -217,11 +296,20 @@ function d3_tsline() {
             .attr("x1", m[1])
             .attr("x2", w + 1);
 
-        // Add the line path.
-        g.append("svg:path")
-            .attr("class", "line")
-            .attr("clip-path", "url(#clip)")
-            .attr("d", line(values));
+        // Add the line paths (one per series)
+        var paths = g.selectAll("path")
+            .data(self.data)
+            .enter().append("svg:path")
+            .attr("d", self.linemaker(w,h))
+            .attr("class", "line summary")
+            .attr("clip-path", "url(#summary-clip)");
+
+        var i=0;
+        self.series.forEach( function(series) {
+            series.summary_path = paths[0][i++];
+            var clazz = series.summary_path.getAttribute("class");
+            series.summary_path.setAttribute("class", clazz + " " + series.css);
+        });
 
         self.draw_slider(svg);
 
@@ -383,7 +471,19 @@ function d3_tsline() {
 
     self.sizer_end = function(sizer) {
         var clazz = sizer.className.baseVal;
-        self[clazz].x
+        var diffpx = self[clazz].x;
+        // px to data points
+        var diff = Math.round(diffpx * (self.data.length / self.width));
+        //console.log(self.data.length, self.width, diffpx, diff);
+        if( clazz == "left" ) {
+            self.slider.x += diffpx;
+            self.view_span -= diff;
+        } else {
+            self.view_span += diff;
+        }
+        // reset sizer x
+        self[clazz].x = 0;
+        self.redraw_view();
     };
 
     self.redraw_view = function() {
@@ -391,5 +491,8 @@ function d3_tsline() {
         var start = Math.round(self.slider.x * (max_elem / self.slider.max_x));
         self.draw_view( self.data.slice(start, start + self.view_span) );
     };
+
+    // call constructor (after all functions have been loaded)
+    self.init();
 
 };
