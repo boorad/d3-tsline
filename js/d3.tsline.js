@@ -17,7 +17,7 @@ function d3_tsline(id) {
     self.view_span = 64; // view_span (in data points)
     self.yaxis_w = 20;  // TODO fix this hack-ass shit, detect width
 
-    self.interpolation = 'monotone';
+    self.interpolation = 'cardinal';
     self.tension = 0.8;
 
     // slider dimensions (in px)
@@ -69,10 +69,17 @@ function d3_tsline(id) {
         view_end = self.data[0].length - 1 || 0;
         view_start = ((view_end - this.view_span) < 0)
             ? 0 : view_end - this.view_span;
+        self.inner_width = self.width - self.margins[1] - self.margins[3] -
+            self.yaxis_w;
         self.slider.w = Math.round(self.width *
                                    (self.view_span / self.data[0].length));
-        self.slider.x = self.slider.max_x = self.width - self.slider.w -
-            self.margins[1] - self.margins[3] - 20;
+        self.slider.x = self.slider.max_x = self.inner_width - self.slider.w;
+        if( self.slider.x < 0 ) {
+            console.log(self.slider);
+            self.slider.w = self.inner_width;
+            self.slider.x = self.slider.max_x = 0;
+            console.log(self.slider);
+        }
 
         // Parse dates and numbers. We assume values are sorted by date.
         self.data.forEach(function(series) {
