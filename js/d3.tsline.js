@@ -16,7 +16,8 @@ function d3_tsline(id) {
     self.handle_height = 14;
     self.view_span = 64; // view_span (in data points)
     self.yaxis_w = 20;  // TODO fix this hack-ass shit, detect width
-
+    // buffer (in px) for showing a bit more y axis than min/max values
+    self.y_nice_buffer = 2;
     self.interpolation = 'cardinal';
     self.tension = 0.8;
 
@@ -197,8 +198,8 @@ function d3_tsline(id) {
 	var xMin = first[0][0];
 	var xMax = first[ first.length - 1 ][0];
 
-	var yMin = d3.min( values );
-	var yMax = d3.max( values );
+	var yMin = d3.min( values ) - self.y_nice_buffer;
+	var yMax = d3.max( values ) + self.y_nice_buffer;
 
 	return { x: [xMin, xMax], y: [yMin, yMax] };
     };
