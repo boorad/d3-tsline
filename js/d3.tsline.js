@@ -75,10 +75,8 @@ function d3_tsline(id) {
                                    (self.view_span / self.data[0].length));
         self.slider.x = self.slider.max_x = self.inner_width - self.slider.w;
         if( self.slider.x < 0 ) {
-            console.log(self.slider);
             self.slider.w = self.inner_width;
             self.slider.x = self.slider.max_x = 0;
-            console.log(self.slider);
         }
 
         // Parse dates and numbers. We assume values are sorted by date.
