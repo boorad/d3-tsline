@@ -1,7 +1,7 @@
 <html>
   <head>
     <title>d3-tsline</title>
-    <link href='css/d3-tsline.css' media='screen' rel='stylesheet' type='text/css'>
+    <link href='css/d3.tsline.css' media='screen' rel='stylesheet' type='text/css'>
   </head>
   <body>
     <div id='body-container'>
@@ -11,5 +11,15 @@
     <script src='js/d3.csv.js' type='text/javascript'></script>
     <script src='js/d3.time.js' type='text/javascript'></script>
     <script src='js/d3.tsline.js' type='text/javascript'></script>
+    <script>
+      //<![CDATA[
+        var url = "aapl.csv";
+        var mychart = new d3_tsline();
+        
+        d3.csv(url, function(data) {
+          mychart.draw_chart(data);
+        });
+      //]]>
+    </script>
   </body>
 </html>

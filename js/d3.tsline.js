@@ -1,10 +1,6 @@
 
-var url = "aapl.csv";
-var mychart = new d3_tsline();
 
-d3.csv(url, function(data) {
-    mychart.draw_chart(data);
-});
+function d3_tsline(id) {
 
 
 function d3_tsline() {
