@@ -118,7 +118,12 @@ function d3_tsline(id) {
     // so the chart seems to start from the right and scroll left
     self.fill_left_pts = function(interval, fill_value) {
         var len = self.data[0].length;
-        var min_x = self.data[0][0][0].valueOf();
+        // TODO: if no data is provided and we call this function, what is the
+        // default min_x?  maybe provide it as 3rd optional argument?
+        var min_x = 0;
+        try {
+            min_x = self.data[0][0][0].valueOf();
+        } catch(e) {}
         for( var i = min_x - 1;
              i > (min_x - (self.view_span - len) - 1);
              i = i - interval ) {
