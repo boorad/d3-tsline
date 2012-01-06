@@ -17,7 +17,7 @@ function d3_tsline(id) {
     self.view_span = 64; // view_span (in data points)
     self.yaxis_w = 20;  // TODO fix this hack-ass shit, detect width
 
-    self.interpolation = 'cardinal';
+    self.interpolation = 'monotone';
     self.tension = 0.8;
 
     // slider dimensions (in px)
@@ -55,7 +55,9 @@ function d3_tsline(id) {
 
     self.parse_date = function(dt) { return dt; }; // js Date object
     //self.parse_date = function(dt) { return new Date(dt*1000); }; // epoch
-    //self.parse_date = d3.time.format("%b %d, %Y").parse; // mon d, yyyy
+    //self.parse_date = function(dt) {
+    //    d3.time.format("%b %d, %Y").parse(dt); // mon d, yyyy
+    //}
     self.parse_val = function(val) { return val; };
 
     self.draw_chart = function() {
@@ -88,7 +90,7 @@ function d3_tsline(id) {
 
         self.discover_range();
         self.draw_view(view_data);
-        //self.draw_summary(self.data);
+        self.draw_summary(self.data);
     };
 
     self.is_valid = function(arr) {
@@ -146,14 +148,15 @@ function d3_tsline(id) {
         var domain = self.domain();
 
         self.x = function(w) {
-            return d3.time.scale()
+            //return d3.time.scale()
+            return d3.scale.linear()
                 .range([self.margins[1], w])
                 .domain(domain.x);
         };
         self.y = function(h) {
             return d3.scale.linear()
                 .range([h, 0])
-                .domain(domain.y);
+                .domain(domain.y).nice();
         };
         self.xAxis = function(w,h) {
             var x = self.x(w);
@@ -189,8 +192,8 @@ function d3_tsline(id) {
 	var xMin = first[0][0];
 	var xMax = first[ first.length - 1 ][0];
 
-	var yMin = d3.min( values ) - 2;
-	var yMax = d3.max( values ) + 2;
+	var yMin = d3.min( values );
+	var yMax = d3.max( values );
 
 	return { x: [xMin, xMax], y: [yMin, yMax] };
     };
@@ -233,7 +236,7 @@ function d3_tsline(id) {
         // Add the border.
         svg.append("svg:rect")
             .attr("class", "border")
-            .attr("x", 20) // TODO: change to y axis 'width' somehow
+            .attr("x", self.yaxis_w)
             .attr("y", 0)
             .attr("width", w - m[3])
             .attr("height", h + m[2] + 1); // hide bottom border w/ +1
@@ -245,7 +248,9 @@ function d3_tsline(id) {
             .call(yAxis);
 
         // Add the line paths (one per series)
-        var paths = svg.selectAll("path")
+        // the selectAll should return only the series line <path> elements
+        // i.e. the same number of lines as there are data arrays in self.data
+        var paths = svg.selectAll("path.line")
             .data(self.data)
             .enter().append("svg:path")
             .attr("d", self.linemaker(w,h))
@@ -256,7 +261,9 @@ function d3_tsline(id) {
         self.series.forEach( function(series) {
             series.path = paths[0][i++];
             var clazz = series.path.getAttribute("class");
-            series.path.setAttribute("class", clazz + " " + series.css);
+            if( series.css ) {
+                series.path.setAttribute("class", clazz + " " + series.css);
+            }
         });
 
     };
@@ -299,7 +306,7 @@ function d3_tsline(id) {
             .attr("x2", w + 1);
 
         // Add the line paths (one per series)
-        var paths = g.selectAll("path")
+        var paths = g.selectAll("path.line.summary")
             .data(self.data)
             .enter().append("svg:path")
             .attr("d", self.linemaker(w,h))
