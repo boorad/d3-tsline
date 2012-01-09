@@ -99,7 +99,7 @@ function d3_tsline(id) {
 
     self.move_scroller = function() {
         var s = self.view_svg.select(".scroller");
-        var x = self.x( self.width );
+        var x = self.x( self.width, true );
         var diff = x(1) - x(0);
         s.attr("transform", "translate(" + 0 + ")")
             .transition()
@@ -175,8 +175,8 @@ function d3_tsline(id) {
     };
 
     // An area generator, for the light fill.
-    self.areamaker = function(w,h) {
-        var x = self.x(w);
+    self.areamaker = function(w, h, offset_for_scroll) {
+        var x = self.x(w, offset_for_scroll);
         var y = self.y(h);
         return d3.svg.area()
             .x(function(d) { return x(d[0]); })
@@ -186,9 +186,9 @@ function d3_tsline(id) {
     };
 
     // A line generator, for the dark stroke.
-    self.linemaker = function() {
-        var x = self.x(self.width);
-        var y = self.y(self.height);
+    self.linemaker = function(w, h, offset_for_scroll) {
+        var x = self.x(w, offset_for_scroll);
+        var y = self.y(h);
         return d3.svg.line()
             .x( function(d) { return x(d[0]) })
             .y( function(d) { return y(d[1]) })
@@ -200,8 +200,9 @@ function d3_tsline(id) {
 
         var domain = self.domain(data);
 
-        self.x = function(w) {
-            var diff = w / data[0].length;
+        self.x = function(w, offset_for_scroll) {
+            var diff = 0;
+            if( offset_for_scroll ) diff = w / data[0].length;
             return d3.scale.linear()
                 .range([1, w + diff]) // overlap to make smooth scroll effect
                 .domain(domain.x);
@@ -297,7 +298,7 @@ function d3_tsline(id) {
         var paths = scroller.selectAll("path.line")
             .data(self.view_data)
             .enter().append("svg:path")
-            .attr("d", self.linemaker())
+            .attr("d", self.linemaker(self.width, self.height, true))
             .attr("class", "line")
             .attr("clip-path", "url(#clip)");
 
@@ -358,7 +359,7 @@ function d3_tsline(id) {
         var paths = g.selectAll("path.line.summary")
             .data(values)
             .enter().append("svg:path")
-            .attr("d", self.linemaker(w,h))
+            .attr("d", self.linemaker(w, h, false))
             .attr("class", "line summary")
             .attr("clip-path", "url(#summary-clip)");
 
