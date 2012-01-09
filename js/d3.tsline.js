@@ -6,9 +6,9 @@ function d3_tsline(id) {
 
     self.selector = id || "#chart";
 
-    self.series = []; // series metadata
-    self.data = [];   // series data
-
+    self.series = [];    // series metadata
+    self.data = [];      // series data
+    self.view_data = []; // view window data
     self.width = 960;
     self.height = 400;
     self.margins = [20, 20, 20, 20]; // top, left, bottom, right (margins)
@@ -20,6 +20,9 @@ function d3_tsline(id) {
     self.y_nice_buffer = 2;
     self.interpolation = 'cardinal';
     self.tension = 0.8;
+
+    self.scroll_view = true;
+    self.scroll_delay = 1000; // in ms
 
     // slider dimensions (in px)
     self.slider = {
@@ -61,42 +64,78 @@ function d3_tsline(id) {
     //}
     self.parse_val = function(val) { return val; };
 
-    self.draw_chart = function() {
-
-        if( !self.is_valid( self.series ) ) return;
-        self.data = self.format_data(self.data);
-
-        // calcs for view window and slider
-        view_end = self.data[0].length - 1 || 0;
-        view_start = ((view_end - this.view_span) < 0)
-            ? 0 : view_end - this.view_span;
-        self.inner_width = self.width - self.margins[1] - self.margins[3] -
-            self.yaxis_w;
-        self.slider.w = Math.round(self.width *
-                                   (self.view_span / self.data[0].length));
-        self.slider.x = self.slider.max_x = self.inner_width - self.slider.w;
-        if( self.slider.x < 0 ) {
-            self.slider.w = self.inner_width;
-            self.slider.x = self.slider.max_x = 0;
-        }
-
+    self.parse_all_data = function() {
         // Parse dates and numbers. We assume values are sorted by date.
         self.data.forEach(function(series) {
             series.forEach(function(d) {
-                d[0] = self.parse_date(d[0]);
-                d[1] = self.parse_val(d[1]);
+                d = self.parse_point(d);
             });
         });
+    };
+
+    self.parse_point = function(pt) {
+        pt[0] = self.parse_date(pt[0]);
+        pt[1] = self.parse_val(pt[1]);
+        return pt;
+    };
+
+    // add a new point to each series, and redraw if update==true
+    self.addSeriesPoints = function(points, update) {
+        points = self.format_data(points);
+        var i=0;
+        points.forEach(function(point) {
+            point = self.parse_point(point);
+            self.data[i++].push(point);
+        });
+        if( update ) self.update();
+    };
+
+    self.update = function() {
+        self.render();
+        self.move_scroller();
+    };
+
+    self.move_scroller = function() {
+        var s = self.view_svg.select(".scroller");
+        var x = self.x( self.width );
+        var diff = x(1) - x(0);
+        s.attr("transform", "translate(" + 0 + ")")
+            .transition()
+            .ease("linear")
+            .duration(self.scroll_delay)
+            .attr("transform", "translate(" + -1 * diff + ")");
+    };
+
+    // calcs for view window and slider
+    self.update_view_calcs = function() {
+
+        view_end = self.data[0].length - 1 || 0;
+        view_start = ((view_end - self.view_span) < 0)
+            ? 0 : view_end - self.view_span;
 
         // make view window slice data arrays (one per series)
-        var view_data = [];
+        var data = [];
         self.data.forEach(function(series) {
-            view_data.push( series.slice(view_start, view_end+1) );
+            data.push( series.slice(view_start, view_end+1) );
         });
+        self.view_data = data;
 
-        self.discover_range();
-        self.draw_view(view_data);
-        self.draw_summary(self.data);
+        self.slider.w = Math.round(self.width *
+                                   (self.view_span / self.data[0].length));
+        self.slider.x = self.slider.max_x = self.width - self.slider.w;
+        if( self.slider.x < 0 ) {
+            self.slider.w = self.width;
+            self.slider.x = self.slider.max_x = 0;
+        }
+
+    };
+
+    self.render = function() {
+        if( !self.is_valid( self.series ) ) return;
+        self.data = self.format_data(self.data);
+        self.update_view_calcs();
+        self.draw_view();
+        self.draw_summary();
     };
 
     self.is_valid = function(arr) {
@@ -114,7 +153,7 @@ function d3_tsline(id) {
             .attr("class", "summary");
     };
 
-    // if we have fewer data points than self.view_span, fill in pts to left
+    // if we have fewer data points than self.view_span, fill in data to left
     // so the chart seems to start from the right and scroll left
     self.fill_left_pts = function(interval, fill_value) {
         var len = self.data[0].length;
@@ -145,9 +184,9 @@ function d3_tsline(id) {
     };
 
     // A line generator, for the dark stroke.
-    self.linemaker = function(w,h) {
-        var x = self.x(w);
-        var y = self.y(h);
+    self.linemaker = function() {
+        var x = self.x(self.width);
+        var y = self.y(self.height);
         return d3.svg.line()
             .x( function(d) { return x(d[0]) })
             .y( function(d) { return y(d[1]) })
@@ -155,13 +194,14 @@ function d3_tsline(id) {
     };
 
     // Scales and axes. inverted domain for the y-scale: bigger is up!
-    self.discover_range = function() {
-        var domain = self.domain();
+    self.discover_range = function(data) {
+
+        var domain = self.domain(data);
 
         self.x = function(w) {
-            //return d3.time.scale()
+            var diff = w / data[0].length;
             return d3.scale.linear()
-                .range([self.margins[1], w])
+                .range([1, w + diff]) // overlap to make smooth scroll effect
                 .domain(domain.x);
         };
         self.y = function(h) {
@@ -181,15 +221,14 @@ function d3_tsline(id) {
             return d3.svg.axis()
                 .scale(y)
                 .ticks(6)
-                .tickSize(-1 * w + 20)
-                .orient("left");
+                .tickSize(4)
+                .orient("right");
         };
     };
 
-    self.domain = function() {
+    self.domain = function(data) {
 
 	var values = [];
-        var data = self.data;
 
         // get all y values from all series
 	data.forEach( function(series) {
@@ -211,60 +250,52 @@ function d3_tsline(id) {
 
 
     // draw the top view pane
-    self.draw_view = function(values) {
+    self.draw_view = function() {
 
-        var m = self.margins;
-        var w = self.width - m[1] - m[3];
-        var h = self.height - m[0] - m[2];
+        var values = self.view_data;
+        self.discover_range(values);
 
         // axis vars
-        var xAxis = self.xAxis(w,h);
-        var yAxis = self.yAxis(w,h);
+        var yAxis = self.yAxis(self.width, self.height);
 
         var view = d3.select(this.selector + " .view");
         view.html(""); // clear everything out of container
 
         // Add an SVG element with the desired dimensions and margin.
-        var svg = view.append("svg:svg")
-            .attr("width", w + m[1] + m[3])
-            .attr("height", h + m[0] + m[2])
-            .append("svg:g")
-            .attr("transform", "translate(" + m[3] + "," + m[0] + ")");
+        var svg = self.view_svg = view.append("svg:svg")
+            .attr("width", self.width)
+            .attr("height", self.height);
 
-        // Add the clip path.
-        svg.append("svg:clipPath")
-            .attr("id", "clip")
-            .append("svg:rect")
-            .attr("width", w)
-            .attr("height", h);
-
-        // Add the x-axis.
-        svg.append("svg:g")
-            .attr("class", "x axis")
-            .attr("transform", "translate(0," + h + ")")
-            .call(xAxis);
-
-        // Add the border.
-        svg.append("svg:rect")
-            .attr("class", "border")
-            .attr("x", self.yaxis_w)
-            .attr("y", 0)
-            .attr("width", w - m[3])
-            .attr("height", h + m[2] + 1); // hide bottom border w/ +1
+        self.draw_scroller();
 
         // Add the y-axis.
         svg.append("svg:g")
             .attr("class", "y axis")
-            .attr("transform", "translate(" + m[1] + ",0)")
             .call(yAxis);
+    };
+
+    self.draw_scroller = function() {
+
+        // remove old
+        self.view_svg.selectAll(".scroller").remove();
+
+        var xAxis = self.xAxis(self.width, self.height);
+        var scroller = self.view_svg.append("svg:g")
+            .attr("class", "scroller");
+
+        // Add the x-axis.
+        scroller.append("svg:g")
+            .attr("class", "x axis")
+            .attr("transform", "translate(0," + (self.height - 15) + ")")
+            .call(xAxis);
 
         // Add the line paths (one per series)
         // the selectAll should return only the series line <path> elements
         // i.e. the same number of lines as there are data arrays in self.data
-        var paths = svg.selectAll("path.line")
-            .data(self.data)
+        var paths = scroller.selectAll("path.line")
+            .data(self.view_data)
             .enter().append("svg:path")
-            .attr("d", self.linemaker(w,h))
+            .attr("d", self.linemaker())
             .attr("class", "line")
             .attr("clip-path", "url(#clip)");
 
@@ -277,21 +308,26 @@ function d3_tsline(id) {
             }
         });
 
+        return scroller;
     };
 
-    self.draw_summary = function(values) {
+    self.draw_summary = function() {
 
-        var m = self.margins,
-            w = self.width - m[1] - m[3],
+        var values = self.data;
+        //self.discover_range(values);
+
+        // remove old
+        var summary = d3.select(self.selector + " .summary");
+        summary.selectAll("*").remove();
+
+        var w = self.width,
             h = self.summary_height;
-        m[0] = 5; // top margin doesn't need to be huge
 
         // Add an SVG element with the desired dimensions and margin.
-        var svg = d3.select(self.selector + " .summary").append("svg:svg")
-            .attr("width", w + m[1] + m[3])
-            .attr("height", h + m[2]);
-        var g = svg.append("svg:g")
-            .attr("transform", "translate(" + m[3] + "," + m[0] + ")");
+        var svg = summary.append("svg:svg")
+            .attr("width", w)
+            .attr("height", h + self.handle_height + 1);
+        var g = svg.append("svg:g");
 
         // Add the clip path.
         g.append("svg:clipPath")
@@ -303,22 +339,22 @@ function d3_tsline(id) {
         // Add the border.
         g.append("svg:rect")
             .attr("class", "border")
-            .attr("x", m[1])
-            .attr("y", 0 - m[0] + 1)
-            .attr("width", w - m[3])
-            .attr("height", h + m[0]);
+            .attr("x", 0)
+            .attr("y", 1)
+            .attr("width", w - 1)
+            .attr("height", h);
 
         // Add top border
         g.append("svg:line")
             .attr("class", "top_border")
-            .attr("y1", -1 * m[0] + 1)
-            .attr("y2", -1 * m[0] + 1)
-            .attr("x1", m[1])
-            .attr("x2", w + 1);
+            .attr("y1", 1)
+            .attr("y2", 1)
+            .attr("x1", 0)
+            .attr("x2", w);
 
         // Add the line paths (one per series)
         var paths = g.selectAll("path.line.summary")
-            .data(self.data)
+            .data(values)
             .enter().append("svg:path")
             .attr("d", self.linemaker(w,h))
             .attr("class", "line summary")
@@ -337,31 +373,29 @@ function d3_tsline(id) {
 
     self.draw_slider = function(svg) {
 
-        var m = self.margins;
         var sizer_w = 9,
+            sizer_halfw = Math.floor(sizer_w/2),
             sizer_h = Math.round(self.summary_height / 3);
 
         // slider_container
         var slider_container = svg.append("svg:g")
-            .attr("transform",
-                  "translate(" + (m[1] + self.yaxis_w) + "," + m[0] + ")")
             .append("svg:g")
             .attr("class", "slider_container")
             .attr("transform",
-                  "translate(" + self.slider.x + ")");
+                  "translate(" + (self.slider.x + sizer_halfw + 1) + ")");
 
         // slider
         var slider = svg.append("svg:g")
             .attr("class", "slider")
             .attr("transform",
-                  "translate(" + (self.slider.x + m[1] + self.yaxis_w) + ")");
+                  "translate(" + (self.slider.x + sizer_halfw + 1) + ")");
 
         // left border and sizer
         var left = slider_container.append("svg:g")
             .attr("class", "left");
 
         left.append("svg:line")
-            .attr("y1", 0 - m[0] + 1)
+            .attr("y1", 1)
             .attr("y2", self.summary_height)
             .attr("x1", 0)
             .attr("x2", 0)
@@ -369,7 +403,7 @@ function d3_tsline(id) {
 
         left.append("svg:rect")
             .attr("class", "sizer")
-            .attr("x", -4)
+            .attr("x", -1 * sizer_halfw)
             .attr("y", Math.round(self.summary_height/2)-Math.round(sizer_h/2))
             .attr("width", sizer_w)
             .attr("height", sizer_h)
@@ -381,15 +415,15 @@ function d3_tsline(id) {
             .attr("class", "right");
 
         right.append("svg:line") // summary right border
-            .attr("y1", 0 - m[0] + 1)
+            .attr("y1", 1)
             .attr("y2", self.summary_height)
-            .attr("x1", self.slider.w)
-            .attr("x2", self.slider.w)
+            .attr("x1", self.slider.w - sizer_w - 2)
+            .attr("x2", self.slider.w - sizer_w - 2)
             .attr("class", "border");
 
         right.append("svg:rect")
             .attr("class", "sizer")
-            .attr("x", self.slider.w-4)
+            .attr("x", self.slider.w - sizer_w - sizer_halfw - 2)
             .attr("y", Math.round(self.summary_height/2)-Math.round(sizer_h/2))
             .attr("width", sizer_w)
             .attr("height", sizer_h)
@@ -399,22 +433,22 @@ function d3_tsline(id) {
         // slider top 'clear'  border
         slider_container.append("svg:line")
             .attr("class", "slider-top-border")
-            .attr("y1", -1 * m[0] + 1)
-            .attr("y2", -1 * m[0] + 1)
+            .attr("y1", 1)
+            .attr("y2", 1)
             .attr("x1", 1)
-            .attr("x2", self.slider.w);
+            .attr("x2", self.slider.w - sizer_w - 2);
 
         // bottom handle
         var handle = slider.append("svg:rect")
             .attr("class", "handle bottom")
             .attr("x", 0)
-            .attr("y", self.summary_height + m[0] + 1)
-            .attr("width", self.slider.w)
+            .attr("y", self.summary_height + 1)
+            .attr("width", self.slider.w - sizer_w - 2)
             .attr("height", self.handle_height);
 
         // raised ridges
         var rt = Math.round(self.handle_height / 2) - 3 +
-            self.summary_height + m[0];
+            self.summary_height;
         var rl = Math.round(self.slider.w / 2) - 4;
         for( var i=0; i < 4; i++ ) {
             slider.append("svg:line")
