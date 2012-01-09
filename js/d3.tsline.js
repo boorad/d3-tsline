@@ -32,6 +32,8 @@ function d3_tsline(id) {
     };
 
     // sizer values
+    self.sizer_width = 9;
+
     self.left = {
         x: 0
     };
@@ -373,7 +375,7 @@ function d3_tsline(id) {
 
     self.draw_slider = function(svg) {
 
-        var sizer_w = 9,
+        var sizer_w = self.sizer_width,
             sizer_halfw = Math.floor(sizer_w/2),
             sizer_h = Math.round(self.summary_height / 3);
 
@@ -503,13 +505,16 @@ function d3_tsline(id) {
     };
 
     self.move_slider = function(origin, dx) {
+        var sizer_w = self.sizer_width;
+        var sizer_halfw = Math.floor(sizer_w/2) + 1;
+
         self.slider.x = origin + dx;
-        if( self.slider.x < 0 ) self.slider.x = 0;
-        if( self.slider.x > self.slider.max_x )
-            self.slider.x = self.slider.max_x;
+        if( self.slider.x < sizer_halfw ) self.slider.x = sizer_halfw;
+        if( self.slider.x > self.slider.max_x + sizer_halfw )
+            self.slider.x = self.slider.max_x + sizer_halfw;
         d3.select(this.selector + " .slider_container")
             .attr("transform", "translate(" + self.slider.x + ")")
-        var slider_new_x = self.slider.x + self.margins[1] + self.yaxis_w;
+        var slider_new_x = self.slider.x;
         d3.select(this.selector + " .slider")
             .attr("transform", "translate(" + slider_new_x + ")")
         self.redraw_view();
