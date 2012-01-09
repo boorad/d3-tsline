@@ -9,15 +9,19 @@ function d3_tsline(id) {
     self.series = [];    // series metadata
     self.data = [];      // series data
     self.view_data = []; // view window data
+    self.domain = {
+        view:    { x: [0,0], y: [0,0] },
+        summary: { x: [0,0], y: [0,0] }
+    };
+
     self.width = 960;
     self.height = 400;
-    self.margins = [20, 20, 20, 20]; // top, left, bottom, right (margins)
     self.summary_height = 50;
     self.handle_height = 14;
     self.view_span = 64; // view_span (in data points)
-    self.yaxis_w = 20;  // TODO fix this hack-ass shit, detect width
     // buffer (in px) for showing a bit more y axis than min/max values
     self.y_nice_buffer = 2;
+    self.orient_y = "right";
     self.interpolation = 'cardinal';
     self.tension = 0.8;
 
@@ -81,12 +85,18 @@ function d3_tsline(id) {
         return pt;
     };
 
+    self.setSeriesData = function(data) {
+        self.data = data;
+        self.set_domain("summary", data);
+    };
+
     // add a new point to each series, and redraw if update==true
     self.addSeriesPoints = function(points, update) {
         points = self.format_data(points);
         var i=0;
         points.forEach(function(point) {
             point = self.parse_point(point);
+            self.update_domain("summary", point);
             self.data[i++].push(point);
         });
         if( update ) self.update();
@@ -98,14 +108,16 @@ function d3_tsline(id) {
     };
 
     self.move_scroller = function() {
-        var s = self.view_svg.select(".scroller");
-        var x = self.x( self.width, true );
-        var diff = x(1) - x(0);
-        s.attr("transform", "translate(" + 0 + ")")
+        var diff = self.get_diff(self.width, self.view_data);
+        // scroll_diff accounts for x() scale function in draw_view()
+        // which renders the entire line one point wider to scroll smoothly
+        var scroll_diff = self.get_diff(self.width + diff, self.view_data);
+        d3.select(self.selector + " .view .scroller")
+            .attr("transform", "translate(" + 0 + ")")
             .transition()
             .ease("linear")
             .duration(self.scroll_delay)
-            .attr("transform", "translate(" + -1 * diff + ")");
+            .attr("transform", "translate(" + -1 * scroll_diff + ")");
     };
 
     // calcs for view window and slider
@@ -118,9 +130,13 @@ function d3_tsline(id) {
         // make view window slice data arrays (one per series)
         var data = [];
         self.data.forEach(function(series) {
-            data.push( series.slice(view_start, view_end+1) );
+            data.push( series.slice(view_start, view_end) );
         });
         self.view_data = data;
+
+        // note: set_domain gets expensive for updates/renders as the view
+        // dataset gets larger
+        self.set_domain("view", data);
 
         self.slider.w = Math.round(self.width *
                                    (self.view_span / self.data[0].length));
@@ -130,6 +146,10 @@ function d3_tsline(id) {
             self.slider.x = self.slider.max_x = 0;
         }
 
+    };
+
+    self.get_diff = function(w, data) {
+        return w / data[0].length;
     };
 
     self.render = function() {
@@ -174,62 +194,9 @@ function d3_tsline(id) {
         }
     };
 
-    // An area generator, for the light fill.
-    self.areamaker = function(w, h, offset_for_scroll) {
-        var x = self.x(w, offset_for_scroll);
-        var y = self.y(h);
-        return d3.svg.area()
-            .x(function(d) { return x(d[0]); })
-            .y0(h)
-            .y1(function(d) { return y(d[1]); })
-            .interpolate(self.interpolation).tension(self.tension);
-    };
-
-    // A line generator, for the dark stroke.
-    self.linemaker = function(w, h, offset_for_scroll) {
-        var x = self.x(w, offset_for_scroll);
-        var y = self.y(h);
-        return d3.svg.line()
-            .x( function(d) { return x(d[0]) })
-            .y( function(d) { return y(d[1]) })
-            .interpolate(self.interpolation).tension(self.tension);
-    };
-
-    // Scales and axes. inverted domain for the y-scale: bigger is up!
-    self.discover_range = function(data) {
-
-        var domain = self.domain(data);
-
-        self.x = function(w, offset_for_scroll) {
-            var diff = 0;
-            if( offset_for_scroll ) diff = w / data[0].length;
-            return d3.scale.linear()
-                .range([1, w + diff]) // overlap to make smooth scroll effect
-                .domain(domain.x);
-        };
-        self.y = function(h) {
-            return d3.scale.linear()
-                .range([h, 0])
-                .domain(domain.y).nice();
-        };
-        self.xAxis = function(w,h) {
-            var x = self.x(w);
-            return d3.svg.axis()
-                .scale(x)
-                .tickSize(-1 * h)
-                .tickSubdivide(false);
-        };
-        self.yAxis = function(w,h) {
-            var y = self.y(h);
-            return d3.svg.axis()
-                .scale(y)
-                .ticks(6)
-                .tickSize(4)
-                .orient("right");
-        };
-    };
-
-    self.domain = function(data) {
+    // set min/max values for x & y
+    // loops through all data, so try not to run except during graph init
+    self.set_domain = function(type, data) {
 
 	var values = [];
 
@@ -240,65 +207,97 @@ function d3_tsline(id) {
 	    } );
 	} );
 
-        // get x min/max from the first series only
-        var first = data[0];
-	var xMin = first[0][0];
-	var xMax = first[ first.length - 1 ][0];
+        var xMin = 0, xMax = 0, yMin = 0, yMax = 0;
 
-	var yMin = d3.min( values ) - self.y_nice_buffer;
-	var yMax = d3.max( values ) + self.y_nice_buffer;
-
-	return { x: [xMin, xMax], y: [yMin, yMax] };
+        if( data && data[0] && data[0][0] ) {
+            // get x min/max from the first series only
+            var first = data[0];
+	    xMin = first[0][0];
+	    xMax = first[ first.length - 1 ][0];
+            // get y min/max from values array built above
+	    yMin = d3.min( values ) - self.y_nice_buffer;
+	    yMax = d3.max( values ) + self.y_nice_buffer;
+        }
+	self.domain[type] = {
+            x: [xMin, xMax],
+            y: [yMin, yMax]
+        };
     };
 
+    self.update_domain = function(type, point) {
+        // min x
+        if( point[0] < self.domain[type].x[0] )
+            self.domain[type].x[0] = point[0];
+        // max x
+        if( point[0] > self.domain[type].x[1] )
+            self.domain[type].x[1] = point[0];
+        // min y
+        if( point[1] < self.domain[type].y[0] )
+            self.domain[type].y[0] = point[1];
+        // max y
+        if( point[1] > self.domain[type].y[1] )
+            self.domain[type].y[1] = point[1];
+    };
 
     // draw the top view pane
     self.draw_view = function() {
 
+        var w = self.width, h = self.height;
         var values = self.view_data;
-        self.discover_range(values);
 
-        // axis vars
-        var yAxis = self.yAxis(self.width, self.height);
+        // set up scale and axis functions
+        var diff = self.get_diff(w, values);
+        var x = d3.scale.linear()
+            .range([1, w + diff]) // overlap to make smooth scroll effect
+            .domain(self.domain.view.x);
+        var y = d3.scale.linear()
+            .range([h, 0])
+            .domain(self.domain.view.y).nice();
+        xAxis = d3.svg.axis()
+            .scale(x)
+            .tickSize(-1 * h)
+            .tickSubdivide(false);
+        yAxis = d3.svg.axis()
+            .scale(y)
+            .ticks(6)
+            .tickSize(4)
+            .orient(self.orient_y);
+
+        // A line generator, for the dark stroke.
+        var line = d3.svg.line()
+            .x( function(d) { return x(d[0]) })
+            .y( function(d) { return y(d[1]) })
+            .interpolate(self.interpolation).tension(self.tension);
 
         var view = d3.select(this.selector + " .view");
         view.html(""); // clear everything out of container
 
         // Add an SVG element with the desired dimensions and margin.
-        var svg = self.view_svg = view.append("svg:svg")
-            .attr("width", self.width)
-            .attr("height", self.height);
+        var svg = view.append("svg:svg")
+            .attr("width", w)
+            .attr("height", h);
 
-        self.draw_scroller();
-
-        // Add the y-axis.
-        svg.append("svg:g")
-            .attr("class", "y axis")
-            .call(yAxis);
-    };
-
-    self.draw_scroller = function() {
+        // draw scroller group, with x axis and data line(s)
 
         // remove old
-        self.view_svg.selectAll(".scroller").remove();
+        svg.selectAll(".scroller").remove();
 
-        var xAxis = self.xAxis(self.width, self.height);
-        var scroller = self.view_svg.append("svg:g")
+        var scroller = svg.append("svg:g")
             .attr("class", "scroller");
 
         // Add the x-axis.
         scroller.append("svg:g")
             .attr("class", "x axis")
-            .attr("transform", "translate(0," + (self.height - 15) + ")")
+            .attr("transform", "translate(0," + (h - 15) + ")")
             .call(xAxis);
 
         // Add the line paths (one per series)
         // the selectAll should return only the series line <path> elements
         // i.e. the same number of lines as there are data arrays in self.data
         var paths = scroller.selectAll("path.line")
-            .data(self.view_data)
+            .data(values)
             .enter().append("svg:path")
-            .attr("d", self.linemaker(self.width, self.height, true))
+            .attr("d", line)
             .attr("class", "line")
             .attr("clip-path", "url(#clip)");
 
@@ -311,20 +310,44 @@ function d3_tsline(id) {
             }
         });
 
-        return scroller;
+        // Add the y-axis.
+        svg.append("svg:g")
+            .attr("class", "y axis")
+            .call(yAxis);
     };
 
     self.draw_summary = function() {
 
         var values = self.data;
-        //self.discover_range(values);
+        var w = self.width, h = self.summary_height;
 
-        // remove old
+        // set up scale and axis functions
+        var diff = w / values[0].length;
+        var x = d3.scale.linear()
+            .range([1, w + diff]) // overlap to make smooth scroll effect
+            .domain(self.domain.summary.x);
+        var y = d3.scale.linear()
+            .range([h, 0])
+            .domain(self.domain.summary.y).nice();
+        xAxis = d3.svg.axis()
+            .scale(x)
+            .tickSize(-1 * h)
+            .tickSubdivide(false);
+        yAxis = d3.svg.axis()
+            .scale(y)
+            .ticks(6)
+            .tickSize(4)
+            .orient(self.orient_y);
+
+        // A line generator, for the dark stroke.
+        var line = d3.svg.line()
+            .x( function(d) { return x(d[0]) })
+            .y( function(d) { return y(d[1]) })
+            .interpolate(self.interpolation).tension(self.tension);
+
+        // remove old dom elements
         var summary = d3.select(self.selector + " .summary");
         summary.selectAll("*").remove();
-
-        var w = self.width,
-            h = self.summary_height;
 
         // Add an SVG element with the desired dimensions and margin.
         var svg = summary.append("svg:svg")
@@ -359,7 +382,7 @@ function d3_tsline(id) {
         var paths = g.selectAll("path.line.summary")
             .data(values)
             .enter().append("svg:path")
-            .attr("d", self.linemaker(w, h, false))
+            .attr("d", line)
             .attr("class", "line summary")
             .attr("clip-path", "url(#summary-clip)");
 
