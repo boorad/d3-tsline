@@ -184,7 +184,7 @@ function d3_tsline(id) {
 
     // if we have fewer data points than self.view_span, fill in data to left
     // so the chart seems to start from the right and scroll left
-    self.fill_left_pts = function(interval, fill_value) {
+    self.fill_left_pts = function(interval, fill_value, seed_x) {
         // handle when no data set, make blank series data for each series
         if( !self.data || !self.data[0] ) {
             self.data = [];
@@ -194,17 +194,19 @@ function d3_tsline(id) {
             });
         }
         var len = self.data[0].length;
-        // TODO: if no data is provided and we call this function, what is the
-        // default min_x?  maybe provide it as 3rd optional argument?
         var min_x = 0;
         try {
             min_x = self.data[0][0][0].valueOf();
-        } catch(e) {}
+        } catch(e) {
+            min_x = seed_x;
+        }
         for( var i = min_x - 1;
              i > (min_x - (self.view_span - len) - 1);
              i = i - interval ) {
             self.data.forEach(function(series) {
-                series.unshift([i,fill_value || null]);
+                var date = self.parse_date(i);
+                var value = self.parse_val(fill_value) || null;
+                series.unshift([date,value]);
             });
         }
     };

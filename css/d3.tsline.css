@@ -2,6 +2,11 @@
     shape-rendering: crispEdges;
 }
 
+.view svg {
+    border-top: 1px solid black;
+    border-right: 1px solid black;
+}
+
 path.line {
     fill: none;
     stroke: #46f;
