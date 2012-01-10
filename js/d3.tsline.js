@@ -262,8 +262,8 @@ function d3_tsline(id) {
 
         // set up scale and axis functions
         var diff = self.get_diff(w, values);
-        var x = d3.scale.linear()
-            .range([1, w + diff]) // overlap to make smooth scroll effect
+        var x = d3.time.scale()
+            .range([1, w + diff])
             .domain(self.domain.view.x);
         var y = d3.scale.linear()
             .range([h, 0])
@@ -338,9 +338,9 @@ function d3_tsline(id) {
 
         // set up scale and axis functions
         var diff = w / values[0].length;
-        var x = d3.scale.linear()
-            .range([1, w + diff]) // overlap to make smooth scroll effect
-            .domain(self.domain.summary.x);
+        var x = d3.time.scale()
+            .range([1, w + diff])
+            .domain(self.domain.view.x);
         var y = d3.scale.linear()
             .range([h, 0])
             .domain(self.domain.summary.y).nice();

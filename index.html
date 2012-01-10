@@ -27,19 +27,17 @@
         var mychart = new d3_tsline("#chart");
         
         // override format_data function, taking json payload and creating
-        // 2-arrays as data points in a series.  Return an array of series
+        // 2-arrays as data points in a series.  Return an array of one series
         mychart.format_data = function(data) {
             var series = [];
-            data.forEach(function(json) {
+            data[0].forEach(function(json) {
                 series.push([json.date, json.val]);
             });
             return [ series ];
         };
         
         // override parse_date function to handle our data's date format
-        mychart.parse_date = function(dt) {
-            d3.time.format("%b %d, %Y").parse(dt);
-        };
+        mychart.parse_date = d3.time.format("%b %d, %Y").parse;
         
         // add some metadata about the series
         mychart.series = [
@@ -47,13 +45,13 @@
                 "name" : "AAPL",
                 "css"  : "aapl"
             }
-        ]
+        ];
         
         // fetch data and draw the chart
         var url = "aapl.csv";
         d3.csv(url, function(data) {
-            mychart.data = data;
-            mychart.draw_chart();
+            mychart.setSeriesData([data]);
+            mychart.render();
         });
       //]]>
     </script>
