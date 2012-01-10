@@ -1,0 +1,33 @@
+#container {
+    font: 10px sans-serif;
+    margin: 0px auto 22px;
+    clear: both;
+    width: 960px;
+}
+
+#chart .view svg {
+    border-top: 1px solid black;
+    border-right: 1px solid black;
+    border-bottom: 1px solid black;
+}
+
+path.line {
+    stroke-width: 3px;
+    fill: none;
+}
+
+.line.male {
+    stroke: steelblue;
+}
+
+.line.female {
+    stroke: pink;
+}
+
+.line.summary {
+    stroke-width: 1px;
+}
+
+div.summary {
+    display: none;
+}

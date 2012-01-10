@@ -14,7 +14,7 @@ function d3_tsline(id) {
         summary: { x: [0,0], y: [0,0] }
     };
 
-    self.width = 960;
+    self.width = 1000;
     self.height = 400;
     self.summary_height = 50;
     self.handle_height = 14;
@@ -26,7 +26,8 @@ function d3_tsline(id) {
     self.tension = 0.8;
 
     self.scroll_view = true;
-    self.scroll_delay = 1000; // in ms
+    self.scroll_delay = 5000; // in ms
+    self.iters = 0;
 
     // slider dimensions (in px)
     self.slider = {
@@ -100,13 +101,15 @@ function d3_tsline(id) {
 
     // add a new point to each series, and redraw if update==true
     self.addSeriesPoints = function(points, update) {
-        points = self.format_data(points);
-        var i=0;
-        points.forEach(function(point) {
-            point = self.parse_point(point);
-            self.update_domain("summary", point);
-            self.data[i++].push(point);
-        });
+        if( points ) {
+            points = self.format_data(points);
+            var i=0;
+            points.forEach(function(point) {
+                point = self.parse_point(point);
+                self.update_domain("summary", point);
+                self.data[i++].push(point);
+            });
+        }
         if( update ) self.update();
     };
 
@@ -116,22 +119,27 @@ function d3_tsline(id) {
     };
 
     self.move_scroller = function() {
+        if( self.iters++ > 100 ) return;
         var diff = self.get_diff(self.width, self.view_data);
         // scroll_diff accounts for x() scale function in draw_view()
         // which renders the entire line one point wider to scroll smoothly
-        var scroll_diff = self.get_diff(self.width + diff, self.view_data);
+        var scroll_diff = diff;//self.get_diff(self.width + diff, self.view_data);
+        console.log(diff, scroll_diff);
         d3.select(self.selector + " .view .scroller")
             .attr("transform", "translate(" + 0 + ")")
             .transition()
             .ease("linear")
             .duration(self.scroll_delay)
-            .attr("transform", "translate(" + -1 * scroll_diff + ")");
+            .attr("transform", "translate(" + -1 * scroll_diff + ")")
+            .each("end", function() {
+                self.addSeriesPoints(self.next_pts, true);
+            });
     };
 
     // calcs for view window and slider
     self.update_view_calcs = function() {
 
-        view_end = self.data[0].length - 1 || 0;
+        view_end = self.data[0].length || 0;
         view_start = ((view_end - self.view_span) < 0)
             ? 0 : view_end - self.view_span;
 
@@ -146,6 +154,7 @@ function d3_tsline(id) {
         // dataset gets larger
         self.set_domain("view", data);
 
+/*
         self.slider.w = Math.round(self.width *
                                    (self.view_span / self.data[0].length));
         self.slider.x = self.slider.max_x = self.width - self.slider.w;
@@ -153,7 +162,7 @@ function d3_tsline(id) {
             self.slider.w = self.width;
             self.slider.x = self.slider.max_x = 0;
         }
-
+*/
     };
 
     self.get_diff = function(w, data) {
@@ -164,7 +173,7 @@ function d3_tsline(id) {
         if( !self.is_valid( self.series ) ) return;
         self.update_view_calcs();
         self.draw_view();
-        self.draw_summary();
+        //self.draw_summary();
     };
 
     self.is_valid = function(arr) {
@@ -237,7 +246,8 @@ function d3_tsline(id) {
         }
 	self.domain[type] = {
             x: [xMin, xMax],
-            y: [yMin, yMax]
+//            y: [yMin, yMax]
+            y: [0-2, 102]
         };
     };
 
@@ -264,8 +274,9 @@ function d3_tsline(id) {
 
         // set up scale and axis functions
         var diff = self.get_diff(w, values);
+
         var x = d3.time.scale()
-            .range([1, w + diff])
+            .range([0, w])
             .domain(self.domain.view.x);
         var y = d3.scale.linear()
             .range([h, 0])
