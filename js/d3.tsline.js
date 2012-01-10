@@ -85,7 +85,15 @@ function d3_tsline(id) {
         return pt;
     };
 
+    // TODO: setSeries() and detect when it's a single series and add the []
+
     self.setSeriesData = function(data) {
+        data = self.format_data(data);
+        data.forEach(function(series) {
+            series.forEach(function(point) {
+                point = self.parse_point(point);
+            });
+        });
         self.data = data;
         self.set_domain("summary", data);
     };
@@ -154,7 +162,6 @@ function d3_tsline(id) {
 
     self.render = function() {
         if( !self.is_valid( self.series ) ) return;
-        self.data = self.format_data(self.data);
         self.update_view_calcs();
         self.draw_view();
         self.draw_summary();
