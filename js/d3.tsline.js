@@ -185,6 +185,14 @@ function d3_tsline(id) {
     // if we have fewer data points than self.view_span, fill in data to left
     // so the chart seems to start from the right and scroll left
     self.fill_left_pts = function(interval, fill_value) {
+        // handle when no data set, make blank series data for each series
+        if( !self.data || !self.data[0] ) {
+            self.data = [];
+            // TODO: handle when no series are set either
+            self.series.forEach(function(series) {
+                self.data.push( [] );
+            });
+        }
         var len = self.data[0].length;
         // TODO: if no data is provided and we call this function, what is the
         // default min_x?  maybe provide it as 3rd optional argument?
