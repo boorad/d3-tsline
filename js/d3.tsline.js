@@ -105,6 +105,7 @@ function d3_tsline(id) {
             points = self.format_data(points);
             var i=0;
             points.forEach(function(point) {
+				point[0] = (new Date().getTime() - self.start) / 1000;
                 point = self.parse_point(point);
                 //self.update_domain("summary", point);
                 self.data[i++].push(point);

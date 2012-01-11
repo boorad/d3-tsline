@@ -83,7 +83,7 @@ function process_json(json) {
 // initial values
 var last_json = null;    // holds last json response that we graphed
 var current_json = null; // holds current json response before graphing
-var start = (new Date().getTime())
+
 
 // chart building
 var chart = chart_init("#chart");
@@ -101,19 +101,19 @@ chart.series = [
 chart.fill_left_pts(1, 50.0, 0);
 chart.view_port_width = 2000;
 chart.update(); // TODO: should be render or init or something
-
+chart.start = (new Date().getTime())
 if( true ) {
 
 // refresh data loop
 var count = 0;
 var refresh_data = window.setInterval( function() {
-    var x = count++;//(new Date().getTime() - start) / 1000;
+    var x = count+=5;//(new Date().getTime() - start) / 1000;
 //    console.log(x);
     var y1 = (Math.random() * 100);
     var y2 = (Math.random() * 100);
     chart.next_pts = [ [x,y1] ,[x,y2]];
 	//console.log("Next point: "+chart.next_pts);
-}, 1000 );
+}, 300 );
 
 /*
 // refresh chart loop
