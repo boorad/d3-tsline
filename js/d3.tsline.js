@@ -321,8 +321,9 @@ function d3_tsline(id) {
             .y( function(d) { return y(d[1]) })
             .interpolate(self.interpolation).tension(self.tension);
 
-        var view = d3.select(this.selector + " .view");
-        view.selectAll("*").remove();
+		var view = d3.select(this.selector + " .view");
+		//	view.html("");
+        //view.selectAll("*").remove();
         // Add an SVG element with the desired dimensions and margin.
         var svg = view.append("svg:svg")
             .attr("width", w)
