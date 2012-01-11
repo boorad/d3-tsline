@@ -106,7 +106,7 @@ function d3_tsline(id) {
             var i=0;
             points.forEach(function(point) {
                 point = self.parse_point(point);
-                self.update_domain("summary", point);
+                //self.update_domain("summary", point);
                 self.data[i++].push(point);
             });
         }
@@ -123,9 +123,10 @@ function d3_tsline(id) {
         var diff = self.get_diff(self.width, self.view_data);
         // scroll_diff accounts for x() scale function in draw_view()
         // which renders the entire line one point wider to scroll smoothly
-        var scroll_diff = 0;//diff;//self.get_diff(self.width + diff, self.view_data);
+		//console.log("diff = "+diff+", "+self.width+", "+self.view_data[0].length);
+        var scroll_diff = diff; //diff;//diff;//self.get_diff(self.width + diff, self.view_data);
         d3.select(self.selector + " .view .scroller")
-            .attr("transform", "translate(" + 0 + ")")
+            .attr("transform", "translate(" + 0 + ",0)")
             .transition()
             .ease("linear")
             .duration(self.scroll_delay)
@@ -145,6 +146,8 @@ function d3_tsline(id) {
         // make view window slice data arrays (one per series)
         var data = [];
 		var toAppend;
+		
+		//console.log("viewstart,end",view_start,view_end);
         self.data.forEach(function(series) {
 			toAppend = series.slice(view_start, view_end);
             data.push(toAppend );
@@ -224,7 +227,6 @@ function d3_tsline(id) {
     // set min/max values for x & y
     // loops through all data, so try not to run except during graph init
     self.set_domain = function(type, data) {
-console.log("Yo");
 	var values = [];
 
         // get all y values from all series
@@ -245,12 +247,13 @@ console.log("Yo");
 	    yMin = d3.min( values ) - self.y_nice_buffer;
 	    yMax = d3.max( values ) + self.y_nice_buffer;
         }
+		
 	self.domain[type] = {
-            x: [xMin.getTime(), xMax.getTime()],
+            //x: [xMax.getTime()-10*1000, xMax.getTime()],
+			x:[xMax.getTime()-10*1000, xMax.getTime()],
 //            y: [yMin, yMax]
             y: [0-1, 100+1]
         };
-		console.log(xMax.getTime());
     };
 
     self.update_domain = function(type, point) {
@@ -274,14 +277,32 @@ console.log("Yo");
         var w = self.width, h = self.height;
         var values = self.view_data;
         // set up scale and axis functions
+		
         var diff = self.get_diff(w, values);
-        var x = d3.time.scale()
+		/*
+		var minX =  9999999;
+		var maxX = -9999999;
+		for (var curSeries in self.data)
+		{
+			var s = (self.data[curSeries]);
+			for (var pt in s){
+				var cur = s[pt];
+				if (cur[0].getTime() < minX) { minX = cur[0].getTime(); }
+				if (cur[0].getTime() > maxX) { maxX = cur[0].getTime(); }
+			}
+		}
+		console.log(minX,maxX, maxX-minX);
+		self.domain.view.x[0] = maxX-1000;
+		self.domain.view.x[1] = maxX;
+		console.log(self.domain.view
+		*/
+        var x = d3.scale.linear()
             .range([0, w])
             .domain(self.domain.view.x);
         var y = d3.scale.linear()
             .range([h, 0])
             .domain(self.domain.view.y).nice();
-		console.log(self.domain.view.x.length);
+		console.log("domain length "+self.domain.view.x,self.domain.view.x[1]-self.domain.view.x[0]);
         xAxis = d3.svg.axis()
             .scale(x)
             .tickSize(-1 * h)
@@ -303,7 +324,7 @@ console.log("Yo");
         var view = d3.select(this.selector + " .view");
 		//view.remove();
         view.html(""); // clear everything out of container
-		
+        view.selectAll("*").remove();
         // Add an SVG element with the desired dimensions and margin.
         var svg = view.append("svg:svg")
             .attr("width", w)
@@ -321,10 +342,11 @@ console.log("Yo");
         // Add the line paths (one per series)
         // the selectAll should return only the series line <path> elements
         // i.e. the same number of lines as there are data arrays in self.data
+		console.log(values[0][values[0].length-1][0].getTime());
         var paths = scroller.selectAll("path.line")
             .data(values)
             .enter().append("svg:path")
-            .attr("d", line)
+         //   .attr("d", line)
             .attr("class", "line")
             .attr("clip-path", "url(#clip)");
 
