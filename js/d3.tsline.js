@@ -123,7 +123,7 @@ function d3_tsline(id) {
         var diff = self.get_diff(self.width, self.view_data);
         // scroll_diff accounts for x() scale function in draw_view()
         // which renders the entire line one point wider to scroll smoothly
-        var scroll_diff = diff;//self.get_diff(self.width + diff, self.view_data);
+        var scroll_diff = 0;//diff;//self.get_diff(self.width + diff, self.view_data);
         d3.select(self.selector + " .view .scroller")
             .attr("transform", "translate(" + 0 + ")")
             .transition()
@@ -224,7 +224,7 @@ function d3_tsline(id) {
     // set min/max values for x & y
     // loops through all data, so try not to run except during graph init
     self.set_domain = function(type, data) {
-
+console.log("Yo");
 	var values = [];
 
         // get all y values from all series
@@ -246,10 +246,11 @@ function d3_tsline(id) {
 	    yMax = d3.max( values ) + self.y_nice_buffer;
         }
 	self.domain[type] = {
-            x: [xMin, xMax],
+            x: [xMin.getTime(), xMax.getTime()],
 //            y: [yMin, yMax]
-            y: [0-2, 102]
+            y: [0-1, 100+1]
         };
+		console.log(xMax.getTime());
     };
 
     self.update_domain = function(type, point) {
@@ -274,23 +275,23 @@ function d3_tsline(id) {
         var values = self.view_data;
         // set up scale and axis functions
         var diff = self.get_diff(w, values);
-
         var x = d3.time.scale()
             .range([0, w])
             .domain(self.domain.view.x);
         var y = d3.scale.linear()
             .range([h, 0])
             .domain(self.domain.view.y).nice();
-		
+		console.log(self.domain.view.x.length);
         xAxis = d3.svg.axis()
             .scale(x)
             .tickSize(-1 * h)
-			.ticks(4)
-            .tickSubdivide(false);
+			.ticks(10)
+			.orient("bottom");
+            //.tickSubdivide(false);
         yAxis = d3.svg.axis()
             .scale(y)
-            .ticks(10)
-            .tickSize(4)
+            .ticks(5)
+            .tickSize(10)
             .orient(self.orient_y);
 
         // A line generator, for the dark stroke.
@@ -301,7 +302,7 @@ function d3_tsline(id) {
 
         var view = d3.select(this.selector + " .view");
 		//view.remove();
-        //view.html(""); // clear everything out of container
+        view.html(""); // clear everything out of container
 		
         // Add an SVG element with the desired dimensions and margin.
         var svg = view.append("svg:svg")
@@ -316,11 +317,6 @@ function d3_tsline(id) {
         var scroller = svg.append("svg:g")
             .attr("class", "scroller");
 
-        // Add the x-axis.
-        scroller.append("svg:g")
-            .attr("class", "x axis")
-            .attr("transform", "translate(0," + (h - 15) + ")")
-            .call(xAxis);
 
         // Add the line paths (one per series)
         // the selectAll should return only the series line <path> elements
@@ -340,95 +336,22 @@ function d3_tsline(id) {
                 series.path.setAttribute("class", clazz + " " + series.css);
             }
         });
+		
+        // Add the x-axis.
+        scroller.append("svg:g")
+            .attr("class", "x axis")
+            .attr("transform", "translate(0," + (h - 15) + ")")
+            .call(xAxis);
 
         // Add the y-axis.
         svg.append("svg:g")
             .attr("class", "y axis")
             .call(yAxis);
+			
+			
     };
 
-    self.draw_summary = function() {
-
-        var values = self.data;
-        var w = self.width, h = self.summary_height;
-
-        // set up scale and axis functions
-        var diff = w / values[0].length;
-        var x = d3.time.scale()
-            .range([1, w + diff])
-            .domain(self.domain.view.x);
-        var y = d3.scale.linear()
-            .range([h, 0])
-            .domain(self.domain.summary.y).nice();
-        xAxis = d3.svg.axis()
-           // .scale(x)
-			.ticks(4)
-            //.tickSize(-1 * h)
-            //.tickSubdivide(false);
-        yAxis = d3.svg.axis()
-            .scale(y)
-            .ticks(6)
-            .tickSize(4)
-            .orient(self.orient_y);
-
-        // A line generator, for the dark stroke.
-        var line = d3.svg.line()
-            .x( function(d) { return x(d[0]) })
-            .y( function(d) { return y(d[1]) })
-            .interpolate(self.interpolation).tension(self.tension);
-
-        // remove old dom elements
-        var summary = d3.select(self.selector + " .summary");
-        summary.selectAll("*").remove();
-
-        // Add an SVG element with the desired dimensions and margin.
-        var svg = summary.append("svg:svg")
-            .attr("width", w)
-            .attr("height", h + self.handle_height + 1);
-        var g = svg.append("svg:g");
-
-        // Add the clip path.
-        g.append("svg:clipPath")
-            .attr("id", "summary-clip")
-            .append("svg:rect")
-            .attr("width", w)
-            .attr("height", h);
-
-        // Add the border.
-        g.append("svg:rect")
-            .attr("class", "border")
-            .attr("x", 0)
-            .attr("y", 1)
-            .attr("width", w - 1)
-            .attr("height", h);
-
-        // Add top border
-        g.append("svg:line")
-            .attr("class", "top_border")
-            .attr("y1", 1)
-            .attr("y2", 1)
-            .attr("x1", 0)
-            .attr("x2", w);
-
-        // Add the line paths (one per series)
-        var paths = g.selectAll("path.line.summary")
-            .data(values)
-            .enter().append("svg:path")
-            .attr("d", line)
-            .attr("class", "line summary")
-            .attr("clip-path", "url(#summary-clip)");
-
-        var i=0;
-        self.series.forEach( function(series) {
-            series.summary_path = paths[0][i++];
-            var clazz = series.summary_path.getAttribute("class");
-            series.summary_path.setAttribute("class", clazz + " " + series.css);
-        });
-
-        self.draw_slider(svg);
-
-    };
-
+   
     self.draw_slider = function(svg) {
 
         var sizer_w = self.sizer_width,

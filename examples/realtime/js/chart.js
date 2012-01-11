@@ -105,11 +105,11 @@ if( true ) {
 
 // refresh data loop
 var refresh_data = window.setInterval( function() {
-    var x = (new Date().getTime() - start) / 10;
+    var x = (new Date().getTime() - start) / 100;
 //    console.log(x);
     var y1 = (Math.random() * 100);
     var y2 = (Math.random() * 100);
-    chart.next_pts = [ [x,y1], [x,y2] ];
+    chart.next_pts = [ [x,y1] ,[x,y2]];
 	//console.log("Next point: "+chart.next_pts);
 }, 400 );
 
