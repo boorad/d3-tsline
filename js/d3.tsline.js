@@ -26,7 +26,7 @@ function d3_tsline(id) {
     self.tension = 0.8;
 
     self.scroll_view = true;
-    self.scroll_delay = 5000; // in ms
+    self.scroll_delay = 1000; // in ms
     self.iters = 0;
 
     // slider dimensions (in px)
@@ -124,7 +124,6 @@ function d3_tsline(id) {
         // scroll_diff accounts for x() scale function in draw_view()
         // which renders the entire line one point wider to scroll smoothly
         var scroll_diff = diff;//self.get_diff(self.width + diff, self.view_data);
-        console.log(diff, scroll_diff);
         d3.select(self.selector + " .view .scroller")
             .attr("transform", "translate(" + 0 + ")")
             .transition()
@@ -145,8 +144,10 @@ function d3_tsline(id) {
 
         // make view window slice data arrays (one per series)
         var data = [];
+		var toAppend;
         self.data.forEach(function(series) {
-            data.push( series.slice(view_start, view_end) );
+			toAppend = series.slice(view_start, view_end);
+            data.push(toAppend );
         });
         self.view_data = data;
 
@@ -268,10 +269,9 @@ function d3_tsline(id) {
 
     // draw the top view pane
     self.draw_view = function() {
-
+		//console.log("Drawing view");
         var w = self.width, h = self.height;
         var values = self.view_data;
-
         // set up scale and axis functions
         var diff = self.get_diff(w, values);
 
@@ -281,13 +281,15 @@ function d3_tsline(id) {
         var y = d3.scale.linear()
             .range([h, 0])
             .domain(self.domain.view.y).nice();
+		
         xAxis = d3.svg.axis()
             .scale(x)
             .tickSize(-1 * h)
+			.ticks(4)
             .tickSubdivide(false);
         yAxis = d3.svg.axis()
             .scale(y)
-            .ticks(6)
+            .ticks(10)
             .tickSize(4)
             .orient(self.orient_y);
 
@@ -298,8 +300,9 @@ function d3_tsline(id) {
             .interpolate(self.interpolation).tension(self.tension);
 
         var view = d3.select(this.selector + " .view");
-        view.html(""); // clear everything out of container
-
+		//view.remove();
+        //view.html(""); // clear everything out of container
+		
         // Add an SVG element with the desired dimensions and margin.
         var svg = view.append("svg:svg")
             .attr("width", w)
@@ -358,9 +361,10 @@ function d3_tsline(id) {
             .range([h, 0])
             .domain(self.domain.summary.y).nice();
         xAxis = d3.svg.axis()
-            .scale(x)
-            .tickSize(-1 * h)
-            .tickSubdivide(false);
+           // .scale(x)
+			.ticks(4)
+            //.tickSize(-1 * h)
+            //.tickSubdivide(false);
         yAxis = d3.svg.axis()
             .scale(y)
             .ticks(6)
