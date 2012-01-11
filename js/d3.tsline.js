@@ -29,9 +29,6 @@ function d3_tsline(id) {
     self.scroll_interval = 1000; // in ms
     self.scrolling = false;
 
-    // for dev
-    self.iters = 0;
-
     // slider dimensions (in px)
     self.slider = {
         x: 729,
@@ -130,7 +127,6 @@ function d3_tsline(id) {
 
     // scrolling mechanism... move svg:g element over to left
     self.move_scroller = function() {
-        if( self.iters++ > 100 ) return;
         var diff = self.get_diff(self.width, self.view_data);
         d3.select(self.selector + " .view .scroller")
             .attr("transform", "translate(" + 0 + ")")
