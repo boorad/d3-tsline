@@ -26,7 +26,10 @@ function d3_tsline(id) {
     self.tension = 0.8;
 
     self.scroll_view = true;
-    self.scroll_delay = 1000; // in ms
+    self.scroll_interval = 1000; // in ms
+    self.scrolling = false;
+
+    // for dev
     self.iters = 0;
 
     // slider dimensions (in px)
@@ -38,23 +41,15 @@ function d3_tsline(id) {
 
     // sizer values
     self.sizer_width = 9;
-
-    self.left = {
-        x: 0
-    };
-
-    self.right = {
-        x: 0
-    };
+    self.left = { x: 0 };
+    self.right = { x: 0 };
 
     //
     // functions
     //
 
     // ctor, called upon instantiation
-    self.init = function() {
-        self.build_dom();
-    };
+    self.init = function() { };
 
     // override this to shape your data to what d3-tsline wants
     // which is [ series, series, ... ]
@@ -102,34 +97,47 @@ function d3_tsline(id) {
     // add a new point to each series, and redraw if update==true
     self.addSeriesPoints = function(points, update) {
         if( points ) {
-            points = self.format_data(points);
+            // calc the next x
+            var last_index = self.data[0].length - 1;
+            var last_x = self.data[0][last_index][0].getTime();
+            var x = (last_x + self.scroll_interval) / 1000;
+
+            // build the points up in the data series arrays
             var i=0;
             points.forEach(function(point) {
-                point = self.parse_point(point);
+                point = self.parse_point([x, point]);
                 self.update_domain("summary", point);
                 self.data[i++].push(point);
             });
         }
-        if( update ) self.update();
+        if( update ) self.draw_view();
+        if( self.scrolling ) self.move_scroller();
     };
 
-    self.update = function() {
-        self.render();
-        self.move_scroller();
+    // begin scrolling
+    self.start_scroll = function() {
+        self.scrolling = true;
+        // wait for the scroll_interval, then enter scrolling loop
+        setTimeout(function() {
+            self.addSeriesPoints(self.next_pts, true);
+        }, self.scroll_interval);
     };
 
+    // end scrolling
+    self.stop_scroll = function() {
+        self.scrolling = false;
+    };
+
+    // scrolling mechanism... move svg:g element over to left
     self.move_scroller = function() {
         if( self.iters++ > 100 ) return;
         var diff = self.get_diff(self.width, self.view_data);
-        // scroll_diff accounts for x() scale function in draw_view()
-        // which renders the entire line one point wider to scroll smoothly
-        var scroll_diff = 0;//self.get_diff(self.width + diff, self.view_data);
         d3.select(self.selector + " .view .scroller")
             .attr("transform", "translate(" + 0 + ")")
             .transition()
             .ease("linear")
-            .duration(self.scroll_delay)
-            .attr("transform", "translate(" + -1 * scroll_diff + ")")
+            .duration(self.scroll_interval)
+            .attr("transform", "translate(" + -1 * diff + ", 0)")
             .each("end", function() {
                 self.addSeriesPoints(self.next_pts, true);
             });
@@ -139,8 +147,9 @@ function d3_tsline(id) {
     self.update_view_calcs = function() {
 
         view_end = self.data[0].length || 0;
-        view_start = ((view_end - self.view_span) < 0)
-            ? 0 : view_end - self.view_span;
+        view_start = view_end - self.view_span;
+        if( self.scrolling ) view_start--;
+        if( view_start < 0 ) view+start = 0;
 
         // make view window slice data arrays (one per series)
         var data = [];
@@ -155,7 +164,7 @@ function d3_tsline(id) {
         // dataset gets larger
         self.set_domain("view", data);
 
-/*
+/* // TODO: only if summary is enabled
         self.slider.w = Math.round(self.width *
                                    (self.view_span / self.data[0].length));
         self.slider.x = self.slider.max_x = self.width - self.slider.w;
@@ -167,12 +176,13 @@ function d3_tsline(id) {
     };
 
     self.get_diff = function(w, data) {
-        return w / data[0].length;
+        // TODO: the 11 is a magic number, wtf?;
+        return w / (data[0].length - 1) + 11;
     };
 
     self.render = function() {
         if( !self.is_valid( self.series ) ) return;
-        self.update_view_calcs();
+        self.build_dom();
         self.draw_view();
         //self.draw_summary();
     };
@@ -184,12 +194,53 @@ function d3_tsline(id) {
     };
 
     self.build_dom = function() {
+
         d3.select(this.selector)
             .append("div")
             .attr("class", "view");
         d3.select(this.selector)
             .append("div")
             .attr("class", "summary");
+
+        // VIEW dom elements
+
+        var view = d3.select(this.selector + " .view");
+        view.selectAll("*").remove();
+
+        // Add an SVG element with the desired dimensions and margin.
+        var svg = view.append("svg:svg")
+            .attr("width", self.width)
+            .attr("height", self.height);
+
+        // draw scroller group, with x axis and data line(s)
+
+        // remove old
+        svg.selectAll(".scroller").remove();
+
+        var scroller = svg.append("svg:g")
+            .attr("class", "scroller");
+
+        // Add the x-axis.
+        scroller.append("svg:g")
+            .attr("class", "x axis")
+            .attr("transform", "translate(0," + (self.height - 15) + ")");
+
+        // Add the line paths (one per series)
+        // the selectAll should return only the series line <path> elements
+        // i.e. the same number of lines as there are data arrays in self.data
+        self.series.forEach( function(series) {
+            var clazz = series.css ? series.css : "";
+            var path = scroller.append("svg:path")
+                .attr("class", "line " + clazz)
+                .attr("clip-path", "url(#clip)");
+            series.path = path;
+
+        });
+
+        // Add the y-axis.
+        svg.append("svg:g")
+            .attr("class", "y axis");
+
     };
 
     // if we have fewer data points than self.view_span, fill in data to left
@@ -246,11 +297,10 @@ function d3_tsline(id) {
 	    yMax = d3.max( values ) + self.y_nice_buffer;
         }
 	self.domain[type] = {
-            x: [xMin.getTime(), xMax.getTime()],
-//            y: [yMin, yMax]
+            x: [xMin, xMax],
+            //y: [yMin, yMax]
             y: [0-1, 100+1]
         };
-		console.log(xMax.getTime());
     };
 
     self.update_domain = function(type, point) {
@@ -268,25 +318,34 @@ function d3_tsline(id) {
             self.domain[type].y[1] = point[1];
     };
 
-    // draw the top view pane
+    // draw the top view pane (by updating dom elems/attrs)
     self.draw_view = function() {
-		//console.log("Drawing view");
-        var w = self.width, h = self.height;
+
+        var w = self.width, range_w = self.width, h = self.height;
+
+        // get view data set
+        self.update_view_calcs();
         var values = self.view_data;
+
         // set up scale and axis functions
-        var diff = self.get_diff(w, values);
+
+        // if we are scrolling, add overflow point to right
+        if( self.scrolling ) {
+            var diff = self.get_diff(w, values);
+            range_w = w + diff;
+        }
+
         var x = d3.time.scale()
-            .range([0, w])
+            .range([0, range_w])
             .domain(self.domain.view.x);
         var y = d3.scale.linear()
             .range([h, 0])
             .domain(self.domain.view.y).nice();
-		console.log(self.domain.view.x.length);
         xAxis = d3.svg.axis()
             .scale(x)
             .tickSize(-1 * h)
-			.ticks(10)
-			.orient("bottom");
+	    .ticks(10)
+	    .orient("bottom");
             //.tickSubdivide(false);
         yAxis = d3.svg.axis()
             .scale(y)
@@ -301,51 +360,20 @@ function d3_tsline(id) {
             .interpolate(self.interpolation).tension(self.tension);
 
         var view = d3.select(this.selector + " .view");
-        view.selectAll("*").remove();
 
-        // Add an SVG element with the desired dimensions and margin.
-        var svg = view.append("svg:svg")
-            .attr("width", w)
-            .attr("height", h);
+        // update x axis
+        view.select(".x.axis").call(xAxis);
 
-        // draw scroller group, with x axis and data line(s)
+        // update the line paths (one per series)
 
-        // remove old
-        svg.selectAll(".scroller").remove();
-
-        var scroller = svg.append("svg:g")
-            .attr("class", "scroller");
-
-
-        // Add the line paths (one per series)
         // the selectAll should return only the series line <path> elements
         // i.e. the same number of lines as there are data arrays in self.data
-        var paths = scroller.selectAll("path.line")
+        var paths = view.select(".scroller").selectAll("path.line")
             .data(values)
-            .enter().append("svg:path")
-            .attr("d", line)
-            .attr("class", "line")
-            .attr("clip-path", "url(#clip)");
+            .attr("d", line);
 
-        var i=0;
-        self.series.forEach( function(series) {
-            series.path = paths[0][i++];
-            var clazz = series.path.getAttribute("class");
-            if( series.css ) {
-                series.path.setAttribute("class", clazz + " " + series.css);
-            }
-        });
-		
-        // Add the x-axis.
-        scroller.append("svg:g")
-            .attr("class", "x axis")
-            .attr("transform", "translate(0," + (h - 15) + ")")
-            .call(xAxis);
-
-        // Add the y-axis.
-        svg.append("svg:g")
-            .attr("class", "y axis")
-            .call(yAxis);
+        // update y axis
+        view.select(".y.axis").call(yAxis);
     };
 
     self.draw_summary = function() {
