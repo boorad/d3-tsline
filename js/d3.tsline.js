@@ -176,8 +176,7 @@ function d3_tsline(id) {
     };
 
     self.get_diff = function(w, data) {
-        // TODO: the 11 is a magic number, wtf?;
-        return w / (data[0].length - 1) + 11;
+        return w / (data[0].length - 2);
     };
 
     self.render = function() {
