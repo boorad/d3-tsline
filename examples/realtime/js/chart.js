@@ -4,11 +4,13 @@ var start = (new Date().getTime())
 
 // chart instantiation
 var chart = new d3_tsline("#chart");
+chart.show_summary = false;
+chart.fixed_y = {min: 0-1, max: 100+1}; // fix y axis to 0-100
 chart.parse_date = function(dt) {
     // we use seconds, Date uses millis
     return new Date(dt*1000);
 };
-chart.view_span = 10; // show 20 secs by default
+chart.view_span = 20; // show 20 secs by default
 chart.scroll_interval = 1000; // one sec (in millis)
 chart.series = [{
         "name" : "Male",
@@ -18,7 +20,6 @@ chart.series = [{
         "css"  : "female"
     }
 ];
-//chart.setSeriesData( [ [], [] ] ); // i.e. start with no data
 chart.fill_left_pts(1, 50.0, 0);
 chart.render();
 
@@ -39,6 +40,6 @@ chart.start_scroll(); // begin scrolling
 
 // shut down refresh loops after a few secs (for dev)
 var cmd =
-        "window.clearInterval(refresh_data);";
-    //+    "window.clearInterval(refresh_chart);";
+    "window.clearInterval(refresh_data);" +
+    "chart.stop_scroll();";
 var cancel_refresh = setTimeout(cmd, 120 * 1000);

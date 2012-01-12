@@ -29,6 +29,10 @@ function d3_tsline(id) {
     self.scroll_interval = 1000; // in ms
     self.scrolling = false;
 
+    self.show_summary = true;
+    self.fixed_y = null; // let y axis resize based on min/max of values
+    //self.fixed_y = {min: 0-1, max: 100+1}; // fix y axis to 0-100
+
     // slider dimensions (in px)
     self.slider = {
         x: 729,
@@ -88,7 +92,7 @@ function d3_tsline(id) {
             });
         });
         self.data = data;
-        self.set_domain("summary", data);
+        if( self.show_summary ) self.set_domain("summary", data);
     };
 
     // add a new point to each series, and redraw if update==true
@@ -103,7 +107,7 @@ function d3_tsline(id) {
             var i=0;
             points.forEach(function(point) {
                 point = self.parse_point([x, point]);
-                self.update_domain("summary", point);
+                if( self.show_summary ) self.update_domain("summary", point);
                 self.data[i++].push(point);
             });
         }
@@ -160,15 +164,15 @@ function d3_tsline(id) {
         // dataset gets larger
         self.set_domain("view", data);
 
-/* // TODO: only if summary is enabled
-        self.slider.w = Math.round(self.width *
-                                   (self.view_span / self.data[0].length));
-        self.slider.x = self.slider.max_x = self.width - self.slider.w;
-        if( self.slider.x < 0 ) {
-            self.slider.w = self.width;
-            self.slider.x = self.slider.max_x = 0;
+        if( self.show_summary ) {
+            self.slider.w = Math.round(self.width *
+                                       (self.view_span / self.data[0].length));
+            self.slider.x = self.slider.max_x = self.width - self.slider.w;
+            if( self.slider.x < 0 ) {
+                self.slider.w = self.width;
+                self.slider.x = self.slider.max_x = 0;
+            }
         }
-*/
     };
 
     self.get_diff = function(w, data) {
@@ -179,7 +183,7 @@ function d3_tsline(id) {
         if( !self.is_valid( self.series ) ) return;
         self.build_dom();
         self.draw_view();
-        //self.draw_summary();
+        if( self.show_summary ) self.draw_summary();
     };
 
     self.is_valid = function(arr) {
@@ -193,9 +197,11 @@ function d3_tsline(id) {
         d3.select(this.selector)
             .append("div")
             .attr("class", "view");
-        d3.select(this.selector)
-            .append("div")
-            .attr("class", "summary");
+        if( self.show_summary ) {
+            d3.select(this.selector)
+                .append("div")
+                .attr("class", "summary");
+        }
 
         // VIEW dom elements
 
@@ -271,15 +277,6 @@ function d3_tsline(id) {
     // loops through all data, so try not to run except during graph init
     self.set_domain = function(type, data) {
 
-	var values = [];
-
-        // get all y values from all series
-	data.forEach( function(series) {
-	    series.forEach( function(d) {
-		values.push( d[1] );
-	    } );
-	} );
-
         var xMin = 0, xMax = 0, yMin = 0, yMax = 0;
 
         if( data && data[0] && data[0][0] ) {
@@ -287,14 +284,27 @@ function d3_tsline(id) {
             var first = data[0];
 	    xMin = first[0][0];
 	    xMax = first[ first.length - 1 ][0];
-            // get y min/max from values array built above
-	    yMin = d3.min( values ) - self.y_nice_buffer;
-	    yMax = d3.max( values ) + self.y_nice_buffer;
+
+            if( !self.fixed_y ) {
+                // get all y values from all series
+	        var values = [];
+	        data.forEach( function(series) {
+	            series.forEach( function(d) {
+		        values.push( d[1] );
+	            } );
+	        } );
+
+                // get y min/max from values array built above
+	        yMin = d3.min( values ) - self.y_nice_buffer;
+	        yMax = d3.max( values ) + self.y_nice_buffer;
+            } else {
+                yMin = self.fixed_y.min;
+                yMax = self.fixed_y.max;
+            }
         }
 	self.domain[type] = {
             x: [xMin, xMax],
-            //y: [yMin, yMax]
-            y: [0-1, 100+1]
+            y: [yMin, yMax]
         };
     };
 
