@@ -89,3 +89,7 @@ line.tick {
     fill: #ccc;
     cursor: col-resize;
 }
+
+.y.axis.summary path {
+    display: none;
+}
