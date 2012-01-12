@@ -560,17 +560,18 @@ function d3_tsline(id) {
             .attr("x2", self.slider.w - sizer_w - 2);
 
         // bottom handle
+        var handle_w = self.slider.w - sizer_w - 2;
         var handle = slider.append("svg:rect")
             .attr("class", "handle bottom")
             .attr("x", 0)
             .attr("y", self.summary_height + 1)
-            .attr("width", self.slider.w - sizer_w - 2)
+            .attr("width", handle_w)
             .attr("height", self.handle_height);
 
         // raised ridges
         var rt = Math.round(self.handle_height / 2) - 3 +
             self.summary_height;
-        var rl = Math.round(self.slider.w / 2) - 4;
+        var rl = Math.round(handle_w / 2) - 4;
         for( var i=0; i < 4; i++ ) {
             slider.append("svg:line")
                 .attr("class", "handle-ridges odd")
