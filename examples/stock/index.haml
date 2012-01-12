@@ -1,6 +1,6 @@
 %html
   %head
-    %title d3-tsline
+    %title Stock Example - d3-tsline
     %link{:href => "../../css/d3.tsline.css", :media => "screen", :rel => "stylesheet", :type => "text/css"}
   :css
     #container {
@@ -37,7 +37,7 @@
               "css"  : "aapl"
           }
       ];
-      chart.view_span = 180;
+      chart.view_span = 120;
       // fetch data and draw the chart
       var data = get_aapl();
       chart.setSeriesData([data]);
