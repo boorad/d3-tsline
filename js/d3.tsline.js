@@ -148,8 +148,15 @@ function d3_tsline(id) {
     self.update_view_calcs = function() {
 
         var max_elem = self.data[0].length - self.view_span;
-        var start = Math.round(self.slider.x * (max_elem / self.slider.max_x));
-        var end = start + self.view_span;
+        var start = 0, end = 0;
+
+        if( self.show_summary ) {
+            start = Math.round(self.slider.x * (max_elem / self.slider.max_x));
+            end = start + self.view_span;
+        } else {
+            end = self.data[0].length || 0;
+            start = end - self.view_span;
+        }
 
         if( self.scrolling ) start--;
         if( start < 0 ) start = 0;
@@ -663,6 +670,12 @@ function d3_tsline(id) {
         // reset sizer x
         self[clazz].x = 0;
         self.draw_view();
+    };
+
+    self.destroy = function() {
+        self.stop_scroll;
+        d3.select(self.selector + " .view, " + self.selector + " .summary")
+            .remove();
     };
 
     // call constructor (after all functions have been loaded)
