@@ -12,14 +12,17 @@ chart.parse_date = function(dt) {
 };
 chart.view_span = 20; // show 20 secs by default
 chart.scroll_interval = 1000; // one sec (in millis)
-chart.series = [{
-        "name" : "Male",
-        "css"  : "male"
-    }, {
-        "name" : "Female",
-        "css"  : "female"
+chart.series = {
+    "all" : {
+        "name" : "Overall Average"
+    },
+    "male" : {
+        "name" : "Male"
+    },
+    "female" : {
+        "name" : "Female"
     }
-];
+};
 chart.fill_left_pts(1, 50.0, 0);
 chart.render();
 
@@ -33,7 +36,11 @@ var refresh_data = window.setInterval( function() {
     var sec = Math.floor(new Date().getTime()/1000) - start;
     var y1 = Math.sin(sec/3) * 50 + 50;
     var y2 = Math.cos(sec/3) * 50 + 50;
-    chart.next_pts = [y1 ,y2];
+    chart.next_pts = {
+        all:    (y1 + y2) / 2,
+        male:   y1,
+        female: y2
+    };
 }, 300 );
 
 chart.start_scroll(); // begin scrolling

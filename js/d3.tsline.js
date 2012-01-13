@@ -6,12 +6,10 @@ function d3_tsline(id) {
 
     self.selector = id || "#chart";
 
-    self.series = [];    // series metadata
-    self.data = [];      // series data
-    self.view_data = []; // view window data
+    self.series = {};    // series objects
     self.domain = {
-        view:    { x: [0,0], y: [0,0] },
-        summary: { x: [0,0], y: [0,0] }
+        view_data:    { x: [0,0], y: [0,0] },
+        data: { x: [0,0], y: [0,0] }
     };
 
     self.width = 1000;
@@ -53,29 +51,20 @@ function d3_tsline(id) {
     // ctor, called upon instantiation
     self.init = function() { };
 
+
     // override this to shape your data to what d3-tsline wants
-    // which is [ series, series, ... ]
-    // and a series is: [ [epoch, value], [epoch, value], ... ]
+    // which is [ [Date, value], [Date, value], ... ]
     self.format_data = function(data) {
         // this default implementation assumes data is in proper format already
         return data;
     };
 
-    self.parse_date = function(dt) { return dt; }; // js Date object
+    self.parse_date = function(dt) { return dt; }; // proper format already
     //self.parse_date = function(dt) { return new Date(dt*1000); }; // epoch
     //self.parse_date = function(dt) {
     //    d3.time.format("%b %d, %Y").parse(dt); // mon d, yyyy
     //}
     self.parse_val = function(val) { return val; };
-
-    self.parse_all_data = function() {
-        // Parse dates and numbers. We assume values are sorted by date.
-        self.data.forEach(function(series) {
-            series.forEach(function(d) {
-                d = self.parse_point(d);
-            });
-        });
-    };
 
     self.parse_point = function(pt) {
         pt[0] = self.parse_date(pt[0]);
@@ -83,34 +72,34 @@ function d3_tsline(id) {
         return pt;
     };
 
-    // TODO: setSeries() and detect when it's a single series and add the []
-
-    self.setSeriesData = function(data) {
+    // TODO: untested after making self.series object-ey
+    self.setSeriesData = function(id, data) {
         data = self.format_data(data);
-        data.forEach(function(series) {
-            series.forEach(function(point) {
-                point = self.parse_point(point);
-            });
+        data.forEach(function(point) {
+            point = self.parse_point(point);
         });
-        self.data = data;
-        if( self.show_summary ) self.set_domain("summary", data);
+        self.series[id].data = data;
+        if( self.show_summary ) self.set_domain("data");
     };
 
     // add a new point to each series, and redraw if update==true
     self.addSeriesPoints = function(points, update) {
         if( points ) {
             // calc the next x
-            var last_index = self.data[0].length - 1;
-            var last_x = self.data[0][last_index][0].getTime();
+            var all = self.series["all"].data;
+            var last_index = all.length - 1;
+            var last_x = all[last_index][0].getTime();
             var x = (last_x + self.scroll_interval) / 1000;
 
-            // build the points up in the data series arrays
-            var i=0;
-            points.forEach(function(point) {
-                point = self.parse_point([x, point]);
-                if( self.show_summary ) self.update_domain("summary", point);
-                self.data[i++].push(point);
-            });
+            // build the points up in the series data arrays
+            for( var id in points ) {
+                if( points.hasOwnProperty(id) ) {
+                    point = self.parse_point([ x, points[id] ]);
+                    if( self.show_summary )
+                        self.update_domain("data", point);
+                    self.series[id].data.push(point);
+                }
+            }
         }
         if( update ) self.draw_view();
         if( self.scrolling ) self.move_scroller();
@@ -132,7 +121,7 @@ function d3_tsline(id) {
 
     // scrolling mechanism... move svg:g element over to left
     self.move_scroller = function() {
-        var diff = self.get_diff(self.width, self.view_data);
+        var diff = self.get_diff(self.width, "view_data");
         d3.select(self.selector + " .view .scroller")
             .attr("transform", "translate(" + 0 + ")")
             .transition()
@@ -147,14 +136,15 @@ function d3_tsline(id) {
     // calcs for view window and slider
     self.update_view_calcs = function() {
 
-        var max_elem = self.data[0].length - self.view_span;
+        var one = self.one_series();
+        var max_elem = one.data.length - self.view_span;
         var start = 0, end = 0;
 
         if( self.show_summary ) {
             start = Math.round(self.slider.x * (max_elem / self.slider.max_x));
             end = start + self.view_span;
         } else {
-            end = self.data[0].length || 0;
+            end = self.series.all.data.length || 0;
             start = end - self.view_span;
         }
 
@@ -162,24 +152,21 @@ function d3_tsline(id) {
         if( start < 0 ) start = 0;
 
         // make view window slice data arrays (one per series)
-        var data = [];
-		var toAppend;
-        self.data.forEach(function(series) {
-	    toAppend = series.slice(start, end);
-            data.push( toAppend );
+        self.series_iter(function(id, elem) {
+	    elem.view_data = self.series[id].data.slice(start, end);
         });
-        self.view_data = data;
 
-        // note: set_domain gets expensive for updates/renders as the view
+        // note: this gets expensive for updates/renders as the view
         // dataset gets larger
-        self.set_domain("view", data);
+        self.set_domain("view_data");
 
     };
 
     self.update_summary_calcs = function() {
         if( self.show_summary ) {
+            var one = self.one_series();
             self.slider.w = Math.round(self.width *
-                                       (self.view_span / self.data[0].length));
+                (self.view_span / one.data.length));
             self.slider.x = self.slider.max_x = self.width - self.slider.w
                 - self.sizer_width/2;
             if( self.slider.x < 0 ) {
@@ -189,21 +176,14 @@ function d3_tsline(id) {
         }
     };
 
-    self.get_diff = function(w, data) {
-        return w / (data[0].length - 2);
+    self.get_diff = function(w, type) {
+        return w / (self.series.all[type].length - 2);
     };
 
     self.render = function() {
-        if( !self.is_valid( self.series ) ) return;
         self.build_dom();
         self.draw_view();
         if( self.show_summary ) self.draw_summary();
-    };
-
-    self.is_valid = function(arr) {
-        if( arr == null ) return false;
-        if( arr.length == 0 ) return false;
-        return true;
     };
 
     self.build_dom = function() {
@@ -241,12 +221,10 @@ function d3_tsline(id) {
             .attr("transform", "translate(0," + (self.height - 15) + ")");
 
         // Add the line paths (one per series)
-        self.series.forEach( function(series) {
-            var clazz = series.css ? series.css : "";
+        self.series_iter(function(id, elem) {
             var path = scroller.append("svg:path")
-                .attr("class", "line " + clazz)
-                .attr("clip-path", "url(#clip)");
-            series.path = path;
+                .attr("class", "line " + id);
+                elem.path = path;
         });
 
         // Add the y-axis.
@@ -255,105 +233,102 @@ function d3_tsline(id) {
 
 
         // SUMMARY dom elements
+        if( self.show_summary ) {
+            var summary = d3.select(self.selector + " .summary");
+            var w=self.width, h=self.summary_height, m=self.summary_margin;
 
-        var summary = d3.select(self.selector + " .summary");
-        var w = self.width, h = self.summary_height, m = self.summary_margin;
-
-        // Add an SVG element with the desired dimensions and margin.
-        svg = summary.append("svg:svg")
-            .attr("width", w)
-            .attr("height", h + self.handle_height + 1);
-        var g = svg.append("svg:g")
-            .attr("transform", "translate(" + m + ")");
+            // Add an SVG element with the desired dimensions and margin.
+            svg = summary.append("svg:svg")
+                .attr("width", w)
+                .attr("height", h + self.handle_height + 1);
+            var g = svg.append("svg:g")
+                .attr("transform", "translate(" + m + ")");
 
 
-        // Add the border.
-        g.append("svg:rect")
-            .attr("class", "border")
-            .attr("x", 0)
-            .attr("y", 1)
-            .attr("width", w - 2*m)
-            .attr("height", h);
+            // Add the border.
+            g.append("svg:rect")
+                .attr("class", "border")
+                .attr("x", 0)
+                .attr("y", 1)
+                .attr("width", w - 2*m)
+                .attr("height", h);
 
-        // Add top border
-        g.append("svg:line")
-            .attr("class", "top_border")
-            .attr("y1", 1)
-            .attr("y2", 1)
-            .attr("x1", -1 * m)
-            .attr("x2", w - m);
+            // Add top border
+            g.append("svg:line")
+                .attr("class", "top_border")
+                .attr("y1", 1)
+                .attr("y2", 1)
+                .attr("x1", -1 * m)
+                .attr("x2", w - m);
 
-        // Add the line paths (one per series)
-        self.series.forEach( function(series) {
-            var clazz = series.css ? series.css : "";
-            var path = g.append("svg:path")
-                .attr("class", "line summary " + clazz)
-                .attr("clip-path", "url(#summary-clip)");
-            series.summary_path = path;
-        });
+            // Add the line paths (one per series)
+            self.series_iter(function(id, elem) {
+                var path = g.append("svg:path")
+                    .attr("class", "line summary " + id);
+                elem.summary_path = path;
+            });
 
-        // Add the x-axis.
-        g.append("svg:g")
-            .attr("class", "x axis summary")
-            .attr("transform", "translate(0," + (h - 15) + ")");
+            // Add the x-axis.
+            g.append("svg:g")
+                .attr("class", "x axis summary")
+                .attr("transform", "translate(0," + (h - 15) + ")");
 
-        // Add the y-axis.
-        g.append("svg:g")
-            .attr("class", "y axis summary");
-
-        //self.draw_slider(svg);
+            // Add the y-axis.
+            g.append("svg:g")
+                .attr("class", "y axis summary");
+        }
 
     };
 
     // if we have fewer data points than self.view_span, fill in data to left
     // so the chart seems to start from the right and scroll left
     self.fill_left_pts = function(interval, fill_value, seed_x) {
+
         // handle when no data set, make blank series data for each series
-        if( !self.data || !self.data[0] ) {
-            self.data = [];
-            // TODO: handle when no series are set either
-            self.series.forEach(function(series) {
-                self.data.push( [] );
-            });
-        }
-        var len = self.data[0].length;
-        var min_x = 0;
+        self.series_iter(function(id, elem) {
+            if( !elem.data ) elem.data = [];
+        });
+
+        var one = self.one_series();
+        var len = one.data.length;
+        var min_x;
         try {
-            min_x = self.data[0][0][0].valueOf();
+            min_x = one[0][0];
         } catch(e) {
             min_x = seed_x;
         }
+        var date, value;
         for( var i = min_x - 1;
              i > (min_x - (self.view_span - len) - 1);
              i = i - interval ) {
-            self.data.forEach(function(series) {
-                var date = self.parse_date(i);
-                var value = self.parse_val(fill_value) || null;
-                series.unshift([date,value]);
+            self.series_iter(function(id, elem) {
+                date = self.parse_date(i);
+                value = self.parse_val(fill_value) || null;
+                elem.data.unshift([date,value]);
             });
         }
     };
 
     // set min/max values for x & y
     // loops through all data, so try not to run except during graph init
-    self.set_domain = function(type, data) {
+    self.set_domain = function(type) {
 
         var xMin = 0, xMax = 0, yMin = 0, yMax = 0;
 
-        if( data && data[0] && data[0][0] ) {
-            // get x min/max from the first series only
-            var first = data[0];
-	    xMin = first[0][0];
-	    xMax = first[ first.length - 1 ][0];
+        var data = self.one_series()[type];
+        if( data && data[0] ) {
+            // get x min/max from the 'one' series
+	    xMin = data[0][0];
+	    xMax = data[ data.length - 1 ][0];
 
             if( !self.fixed_y ) {
                 // get all y values from all series
 	        var values = [];
-	        data.forEach( function(series) {
-	            series.forEach( function(d) {
+	        self.series_iter(function(id, elem) {
+                    elem[type].forEach(function(d) {
 		        values.push( d[1] );
-	            } );
-	        } );
+	            });
+	        });
 
                 // get y min/max from values array built above
 	        yMin = d3.min( values ) - self.y_nice_buffer;
@@ -391,22 +366,21 @@ function d3_tsline(id) {
 
         // get view data set
         self.update_view_calcs();
-        var values = self.view_data;
 
         // set up scale and axis functions
 
         // if we are scrolling, add overflow point to right
         if( self.scrolling ) {
-            var diff = self.get_diff(w, values);
+            var diff = self.get_diff(w, "view_data");
             range_w = w + diff;
         }
 
         var x = d3.time.scale()
             .range([0, range_w])
-            .domain(self.domain.view.x);
+            .domain(self.domain.view_data.x);
         var y = d3.scale.linear()
             .range([h, 0])
-            .domain(self.domain.view.y).nice();
+            .domain(self.domain.view_data.y).nice();
         xAxis = d3.svg.axis()
             .scale(x)
             .tickSize(-1 * h)
@@ -431,12 +405,11 @@ function d3_tsline(id) {
         view.select(".x.axis").call(xAxis);
 
         // update the line paths (one per series)
-
-        // the selectAll should return only the series line <path> elements
-        // i.e. the same number of lines as there are data arrays in self.data
-        var paths = view.select(".scroller").selectAll("path.line")
-            .data(values)
-            .attr("d", line);
+        self.series_iter(function(id, elem) {
+            elem.path
+                .data([elem.view_data])
+                .attr("d", line);
+        });
 
         // update y axis
         view.select(".y.axis").call(yAxis);
@@ -448,15 +421,14 @@ function d3_tsline(id) {
 
         // get summary data set
         self.update_summary_calcs();
-        var values = self.data;
 
         // set up scale and axis functions
         var x = d3.time.scale()
             .range([1, w - 2*m])
-            .domain(self.domain.summary.x);
+            .domain(self.domain.data.x);
         var y = d3.scale.linear()
             .range([h, 0])
-            .domain(self.domain.summary.y).nice();
+            .domain(self.domain.data.y).nice();
         xAxis = d3.svg.axis()
             .scale(x)
 	    .ticks(4)
@@ -480,12 +452,11 @@ function d3_tsline(id) {
         summary.select(".x.axis.summary").call(xAxis);
 
         // update the line paths (one per series)
-
-        // the selectAll should return only the series line <path> elements
-        // i.e. the same number of lines as there are data arrays in self.data
-        var paths = summary.selectAll("path.line")
-            .data(values)
-            .attr("d", line);
+        self.series_iter(function(id, elem) {
+            elem.summary_path
+                .data([elem.data])
+                .attr("d", line);
+        });
 
         // update y axis
         summary.select(".y.axis.summary").call(yAxis);
@@ -676,6 +647,25 @@ function d3_tsline(id) {
         self.stop_scroll;
         d3.select(self.selector + " .view, " + self.selector + " .summary")
             .remove();
+    };
+
+    // used for operations that need only one series, maybe to get x values
+    self.one_series = function() {
+        var ret = [];
+        self.series_iter(function(id, elem) {
+            ret = elem;
+        }, 1);
+        return ret;
+    };
+
+    self.series_iter = function(fun, limit) {
+        var i=0;
+        for( var id in self.series ) {
+            if( self.series.hasOwnProperty(id) ) {
+                fun(id, self.series[id]);
+            }
+            if( i++ >= limit ) break;
+        }
     };
 
     // call constructor (after all functions have been loaded)
