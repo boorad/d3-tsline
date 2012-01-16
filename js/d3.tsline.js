@@ -222,9 +222,11 @@ function d3_tsline(id) {
 
         // Add the line paths (one per series)
         self.series_iter(function(id, elem) {
-            var path = scroller.append("svg:path")
-                .attr("class", "line " + id);
+            if( elem.active ) {
+                var path = scroller.append("svg:path")
+                    .attr("class", "line " + id);
                 elem.path = path;
+            }
         });
 
         // Add the y-axis.
@@ -263,9 +265,11 @@ function d3_tsline(id) {
 
             // Add the line paths (one per series)
             self.series_iter(function(id, elem) {
-                var path = g.append("svg:path")
-                    .attr("class", "line summary " + id);
-                elem.summary_path = path;
+                if( elem.active ) {
+                    var path = g.append("svg:path")
+                        .attr("class", "line summary " + id);
+                    elem.summary_path = path;
+                }
             });
 
             // Add the x-axis.
@@ -406,9 +410,12 @@ function d3_tsline(id) {
 
         // update the line paths (one per series)
         self.series_iter(function(id, elem) {
-            elem.path
-                .data([elem.view_data])
-                .attr("d", line);
+            if( elem.active ) {
+                // TODO: detect if active, but !elem.path, and add <path>s
+                elem.path
+                    .data([elem.view_data])
+                    .attr("d", line);
+            }
         });
 
         // update y axis
@@ -453,9 +460,12 @@ function d3_tsline(id) {
 
         // update the line paths (one per series)
         self.series_iter(function(id, elem) {
-            elem.summary_path
-                .data([elem.data])
-                .attr("d", line);
+            if( elem.active ) {
+                // TODO: detect if active, but !elem.path, and add <path>s
+                elem.summary_path
+                    .data([elem.data])
+                    .attr("d", line);
+            }
         });
 
         // update y axis
