@@ -14,13 +14,16 @@ chart.view_span = 20; // show 20 secs by default
 chart.scroll_interval = 1000; // one sec (in millis)
 chart.series = {
     "all" : {
-        "name" : "Overall Average"
+        "name"   : "Overall Average",
+        "active" : true
     },
     "male" : {
-        "name" : "Male"
+        "name"   : "Male",
+        "active" : true
     },
     "female" : {
-        "name" : "Female"
+        "name"   : "Female",
+        "active" : true
     }
 };
 chart.fill_left_pts(1, 50.0, 0);
