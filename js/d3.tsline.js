@@ -224,7 +224,7 @@ function d3_tsline(id) {
         self.series_iter(function(id, elem) {
             if( elem.active ) {
                 var path = scroller.append("svg:path")
-                    .attr("class", "line " + id);
+                    .attr("class", "line s_" + id);
                 elem.path = path;
             }
         });
@@ -244,6 +244,7 @@ function d3_tsline(id) {
                 .attr("width", w)
                 .attr("height", h + self.handle_height + 1);
             var g = svg.append("svg:g")
+                .attr("class", "lines")
                 .attr("transform", "translate(" + m + ")");
 
 
@@ -267,7 +268,7 @@ function d3_tsline(id) {
             self.series_iter(function(id, elem) {
                 if( elem.active ) {
                     var path = g.append("svg:path")
-                        .attr("class", "line summary " + id);
+                        .attr("class", "line summary s_" + id);
                     elem.summary_path = path;
                 }
             });
@@ -282,6 +283,50 @@ function d3_tsline(id) {
                 .attr("class", "y axis summary");
         }
 
+    };
+
+    self.activate_series = function(series) {
+        if( self.series[series] && !self.series[series].active ) {
+
+            // view path
+            var path = d3.select(self.selector + " .view .scroller")
+                .append("svg:path")
+                .attr("class", "line s_" + series);
+            self.series[series].path = path;
+
+            // summary path
+            if( self.show_summary ) {
+                var path = d3.select(self.selector + " .summary .lines")
+                    .append("svg:path")
+                    .attr("class", "line summary s_" + series);
+                self.series[series].summary_path = path;
+            }
+
+            // active attrib
+            self.series[series].active = true;
+
+        }
+    };
+
+    self.deactivate_series = function(series) {
+        if( self.series[series] ) {
+
+            // view path
+            d3.selectAll(self.selector + " .view .scroller path.s_" + series)
+                .remove();
+            self.series[series].path = null;
+
+            // summary path
+            if( self.show_summary ) {
+                d3.selectAll(self.selector + " .summary .lines path.s_"+series)
+                    .remove()
+                self.series[series].summary_path = null;
+            }
+
+            // active attrib
+            self.series[series].active = false;
+
+        }
     };
 
     // if we have fewer data points than self.view_span, fill in data to left
@@ -329,9 +374,11 @@ function d3_tsline(id) {
                 // get all y values from all series
 	        var values = [];
 	        self.series_iter(function(id, elem) {
-                    elem[type].forEach(function(d) {
-		        values.push( d[1] );
-	            });
+                    if( elem.active ) {
+                        elem[type].forEach(function(d) {
+		            values.push( d[1] );
+	                });
+                    }
 	        });
 
                 // get y min/max from values array built above
@@ -394,7 +441,7 @@ function d3_tsline(id) {
         yAxis = d3.svg.axis()
             .scale(y)
             .ticks(5)
-            .tickSize(5)
+            .tickSize(w)
             .orient(self.orient_y);
 
         // A line generator, for the dark stroke.
@@ -410,8 +457,7 @@ function d3_tsline(id) {
 
         // update the line paths (one per series)
         self.series_iter(function(id, elem) {
-            if( elem.active ) {
-                // TODO: detect if active, but !elem.path, and add <path>s
+            if( elem.active && elem.path ) {
                 elem.path
                     .data([elem.view_data])
                     .attr("d", line);
@@ -460,8 +506,7 @@ function d3_tsline(id) {
 
         // update the line paths (one per series)
         self.series_iter(function(id, elem) {
-            if( elem.active ) {
-                // TODO: detect if active, but !elem.path, and add <path>s
+            if( elem.active && elem.summary_path) {
                 elem.summary_path
                     .data([elem.data])
                     .attr("d", line);
