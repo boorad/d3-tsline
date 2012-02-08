@@ -7,6 +7,7 @@ function d3_tsline(id) {
     self.selector = id || "#chart";
 
     self.series = {};    // series objects
+    self.ref_series = null; // default series to base calcs
     self.domain = {
         view_data:    { x: [0,0], y: [0,0] },
         data: { x: [0,0], y: [0,0] }
@@ -51,6 +52,10 @@ function d3_tsline(id) {
     // ctor, called upon instantiation
     self.init = function() { };
 
+    self.print_epoch = function(msg) {
+        var time = (new Date()).valueOf();
+        console.log(msg, time);
+    };
 
     // override this to shape your data to what d3-tsline wants
     // which is [ [Date, value], [Date, value], ... ]
@@ -72,7 +77,6 @@ function d3_tsline(id) {
         return pt;
     };
 
-    // TODO: untested after making self.series object-ey
     self.setSeriesData = function(id, data) {
         data = self.format_data(data);
         data.forEach(function(point) {
@@ -86,20 +90,26 @@ function d3_tsline(id) {
     self.addSeriesPoints = function(points, update) {
         if( points ) {
             // calc the next x
-            var all = self.series["all"].data;
-            var last_index = all.length - 1;
-            var last_x = all[last_index][0].getTime();
+            var one = self.one_series().data;
+            var last_index = one.length - 1;
+            var last_x = one[last_index][0].getTime();
             var x = (last_x + self.scroll_interval) / 1000;
 
             // build the points up in the series data arrays
-            for( var id in points ) {
-                if( points.hasOwnProperty(id) ) {
+            self.series_iter(function(id, elem) {
+                var point;
+                if( points[id] ) {
+                    // we have a new value in next_pts
                     point = self.parse_point([ x, points[id] ]);
-                    if( self.show_summary )
-                        self.update_domain("data", point);
-                    self.series[id].data.push(point);
+                } else {
+                    // use previous point's value
+                    point = self.parse_point(
+                        [x, elem.data[elem.data.length-1][1] ]);
                 }
-            }
+                if( self.show_summary )
+                    self.update_domain("data", point);
+                elem.data.push(point);
+            });
         }
         if( update ) self.draw_view();
         if( self.scrolling ) self.move_scroller();
@@ -108,29 +118,37 @@ function d3_tsline(id) {
     // begin scrolling
     self.start_scroll = function() {
         self.scrolling = true;
-        // wait for the scroll_interval, then enter scrolling loop
-        setTimeout(function() {
-            self.addSeriesPoints(self.next_pts, true);
-        }, self.scroll_interval);
+        self.addSeriesPoints(self.next_pts, true);
     };
 
     // end scrolling
     self.stop_scroll = function() {
         self.scrolling = false;
+        setTimeout(function() {
+            clearTimeout(self.scroll_timer);
+        }, self.timer_interval());
     };
 
     // scrolling mechanism... move svg:g element over to left
     self.move_scroller = function() {
         var diff = self.get_diff(self.width, "view_data");
+        var tdiff = self.timer_interval();
         d3.select(self.selector + " .view .scroller")
             .attr("transform", "translate(" + 0 + ")")
             .transition()
             .ease("linear")
             .duration(self.scroll_interval)
-            .attr("transform", "translate(" + -1 * diff + ", 0)")
-            .each("end", function() {
-                self.addSeriesPoints(self.next_pts, true);
-            });
+            .attr("transform", "translate(" + -1 * diff + ", 0)");
+        self.scroll_timer = setTimeout(function() {
+            self.addSeriesPoints(self.next_pts, true);
+        }, tdiff);
+
+    };
+
+    self.timer_interval = function() {
+        var now = (new Date()).valueOf() / 1000;
+        var diff = self.scroll_interval - ((now - now.toFixed(0)) * 1000);
+        return Math.round(diff);
     };
 
     // calcs for view window and slider
@@ -177,7 +195,8 @@ function d3_tsline(id) {
     };
 
     self.get_diff = function(w, type) {
-        return w / (self.series.all[type].length - 2);
+        var one = self.one_series();
+        return w / (one[type].length - 2);
     };
 
     self.render = function() {
@@ -346,9 +365,11 @@ function d3_tsline(id) {
         } catch(e) {
             min_x = seed_x;
         }
+        if( self.scrolling ) min_x--;
+
         var date, value;
         for( var i = min_x - 1;
-             i > (min_x - (self.view_span - len) - 1);
+             i >= (min_x - (self.view_span - len) - 1);
              i = i - interval ) {
             self.series_iter(function(id, elem) {
                 date = self.parse_date(i);
@@ -441,7 +462,7 @@ function d3_tsline(id) {
         yAxis = d3.svg.axis()
             .scale(y)
             .ticks(5)
-            .tickSize(w)
+            .tickSize(5)
             .orient(self.orient_y);
 
         // A line generator, for the dark stroke.
@@ -706,11 +727,9 @@ function d3_tsline(id) {
 
     // used for operations that need only one series, maybe to get x values
     self.one_series = function() {
-        var ret = [];
-        self.series_iter(function(id, elem) {
-            ret = elem;
-        }, 1);
-        return ret;
+        if( self.ref_series )
+            return self.series[self.ref_series];
+        throw "ref_series not set?";
     };
 
     self.series_iter = function(fun, limit) {
