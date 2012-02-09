@@ -26,6 +26,7 @@ chart.series = {
         "active" : true
     }
 };
+chart.ref_series = "all";
 chart.fill_left_pts(1, 50.0, 0);
 chart.render();
 
