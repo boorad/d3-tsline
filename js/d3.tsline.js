@@ -300,6 +300,138 @@ function d3_tsline(id) {
             // Add the y-axis.
             g.append("svg:g")
                 .attr("class", "y axis summary");
+
+
+            // SLIDER dom elements
+
+            var sizer_w = self.sizer_width,
+            sizer_halfw = Math.floor(sizer_w/2),
+            sizer_h = Math.round(self.summary_height / 3);
+
+            // slider_container
+            var slider_container = svg.append("svg:g")
+                .append("svg:g")
+                .attr("class", "slider_container");
+
+            // slider
+            var slider = svg.append("svg:g")
+                .attr("class", "slider");
+
+            // left border and sizer
+            var left = slider_container.append("svg:g")
+                .attr("class", "left");
+
+            left.append("svg:line")
+                .attr("y1", 1)
+                .attr("y2", self.summary_height)
+                .attr("x1", 0)
+                .attr("x2", 0)
+                .attr("class", "border");
+
+            left.append("svg:rect")
+                .attr("class", "sizer")
+                .attr("x", -1 * sizer_halfw)
+                .attr("y", Math.round(self.summary_height/2)-Math.round(sizer_h/2))
+                .attr("width", sizer_w)
+                .attr("height", sizer_h)
+                .attr("rx", 2)
+                .attr("ry", 2)
+
+            // right border and sizer
+            var right = slider_container.append("svg:g")
+                .attr("class", "right");
+
+            right.append("svg:line") // summary right border
+                .attr("y1", 1)
+                .attr("y2", self.summary_height)
+                .attr("x1", sizer_w - 2)
+                .attr("x2", sizer_w - 2)
+                .attr("class", "border");
+
+            right.append("svg:rect")
+                .attr("class", "sizer")
+                .attr("x", sizer_w - sizer_halfw - 2)
+                .attr("y", Math.round(self.summary_height/2)-Math.round(sizer_h/2))
+                .attr("width", sizer_w)
+                .attr("height", sizer_h)
+                .attr("rx", 2)
+                .attr("ry", 2)
+
+            // slider top 'clear'  border
+            slider_container.append("svg:line")
+                .attr("class", "slider-top-border")
+                .attr("y1", 1)
+                .attr("y2", 1)
+                .attr("x1", 1)
+                .attr("x2", self.slider.w - sizer_w - 2);
+
+            // bottom handle
+            var handle_w = self.slider.w - sizer_w - 2;
+            var handle = slider.append("svg:rect")
+                .attr("class", "handle bottom")
+                .attr("x", 0)
+                .attr("y", self.summary_height + 1)
+                .attr("width", handle_w)
+                .attr("height", self.handle_height);
+
+            // raised ridges
+            var rt = Math.round(self.handle_height / 2) - 3 +
+                self.summary_height;
+            var rl = Math.round(handle_w / 2) - 4;
+            var ridges = slider.append("svg:g")
+                .attr("class", "ridges")
+                .attr("transform", "translate(" + rl + ")");
+            for( var i=0; i < 4; i++ ) {
+                ridges.append("svg:line")
+                    .attr("class", "handle-ridges odd")
+                    .attr("y1", rt)
+                    .attr("y2", rt + 5)
+                    .attr("x1", (i*2))
+                    .attr("x2", (i*2));
+
+                ridges.append("svg:line")
+                    .attr("class", "handle-ridges even")
+                    .attr("y1", rt + 1)
+                    .attr("y2", rt + 6)
+                    .attr("x1", (i*2) + 1)
+                    .attr("x2", (i*2) + 1);
+            }
+
+            // dragging
+            slider.call(d3.behavior.drag()
+                        .on("dragstart", function(d) {
+                            this.__origin__ = self.slider.x;
+                            this.__offset__ = 0;
+                        })
+                        .on("drag", function(d) {
+                            this.__offset__ += d3.event.dx;
+                            self.move_slider(this.__origin__, this.__offset__);
+                        })
+                        .on("dragend", function() {
+                            delete this.__origin__;
+                            delete this.__offset__;
+                        }));
+
+            // dragging on left/right sizers
+            var sizer_spec = d3.behavior.drag()
+                .on("dragstart", function(d) {
+                    var clazz = this.className.baseVal;
+                    this.__origin__ = self[clazz].x;
+                    this.__offset__ = 0;
+                })
+                .on("drag", function(d) {
+                    this.__offset__ += d3.event.dx;
+                    self.move_sizer(this);
+                })
+                .on("dragend", function() {
+                    delete this.__origin__;
+                    delete this.__offset__;
+                    self.sizer_end(this);
+                });
+            left.call(sizer_spec);
+            right.call(sizer_spec);
+
+
         }
 
     };
@@ -542,140 +674,35 @@ function d3_tsline(id) {
 
     self.draw_slider = function() {
 
-        // TODO: add most of this to build_dom and this function becomes a
-        // repositioning / redrawing function, like draw_summary and draw_view.
+        console.log("draw_slider");
 
-        var svg = d3.select(this.selector + " .summary svg");
-        svg.selectAll(".slider_container .slider").remove();
-
-        var sizer_w = self.sizer_width,
-            sizer_halfw = Math.floor(sizer_w/2),
-            sizer_h = Math.round(self.summary_height / 3);
-
-        // slider_container
-        var slider_container = svg.append("svg:g")
-            .append("svg:g")
-            .attr("class", "slider_container")
-            .attr("transform",
-                  "translate(" + (self.slider.x + 1) + ")");
-
-        // slider
-        var slider = svg.append("svg:g")
-            .attr("class", "slider")
-            .attr("transform",
-                  "translate(" + (self.slider.x + 1) + ")");
-
-        // left border and sizer
-        var left = slider_container.append("svg:g")
-            .attr("class", "left");
-
-        left.append("svg:line")
-            .attr("y1", 1)
-            .attr("y2", self.summary_height)
-            .attr("x1", 0)
-            .attr("x2", 0)
-            .attr("class", "border");
-
-        left.append("svg:rect")
-            .attr("class", "sizer")
-            .attr("x", -1 * sizer_halfw)
-            .attr("y", Math.round(self.summary_height/2)-Math.round(sizer_h/2))
-            .attr("width", sizer_w)
-            .attr("height", sizer_h)
-            .attr("rx", 2)
-            .attr("ry", 2)
-
-        // right border and sizer
-        var right = slider_container.append("svg:g")
-            .attr("class", "right");
-
-        right.append("svg:line") // summary right border
-            .attr("y1", 1)
-            .attr("y2", self.summary_height)
-            .attr("x1", self.slider.w - sizer_w - 2)
-            .attr("x2", self.slider.w - sizer_w - 2)
-            .attr("class", "border");
-
-        right.append("svg:rect")
-            .attr("class", "sizer")
-            .attr("x", self.slider.w - sizer_w - sizer_halfw - 2)
-            .attr("y", Math.round(self.summary_height/2)-Math.round(sizer_h/2))
-            .attr("width", sizer_w)
-            .attr("height", sizer_h)
-            .attr("rx", 2)
-            .attr("ry", 2)
-
-        // slider top 'clear'  border
-        slider_container.append("svg:line")
-            .attr("class", "slider-top-border")
-            .attr("y1", 1)
-            .attr("y2", 1)
-            .attr("x1", 1)
-            .attr("x2", self.slider.w - sizer_w - 2);
-
-        // bottom handle
+        var sizer_w = self.sizer_width;
         var handle_w = self.slider.w - sizer_w - 2;
-        var handle = slider.append("svg:rect")
-            .attr("class", "handle bottom")
-            .attr("x", 0)
-            .attr("y", self.summary_height + 1)
-            .attr("width", handle_w)
-            .attr("height", self.handle_height);
-
-        // raised ridges
-        var rt = Math.round(self.handle_height / 2) - 3 +
-            self.summary_height;
         var rl = Math.round(handle_w / 2) - 4;
-        for( var i=0; i < 4; i++ ) {
-            slider.append("svg:line")
-                .attr("class", "handle-ridges odd")
-                .attr("y1", rt)
-                .attr("y2", rt + 5)
-                .attr("x1", rl + (i*2))
-                .attr("x2", rl + (i*2));
 
-            slider.append("svg:line")
-                .attr("class", "handle-ridges even")
-                .attr("y1", rt + 1)
-                .attr("y2", rt + 6)
-                .attr("x1", rl + (i*2) + 1)
-                .attr("x2", rl + (i*2) + 1);
-        }
+        var container = d3.select(this.selector + " .slider_container");
+        container.attr("transform",
+                       "translate(" + (self.slider.x + 1) + ")");
 
-        // dragging
-        slider.call(d3.behavior.drag()
-                  .on("dragstart", function(d) {
-                      this.__origin__ = self.slider.x;
-                      this.__offset__ = 0;
-                  })
-                  .on("drag", function(d) {
-                      this.__offset__ += d3.event.dx;
-                      self.move_slider(this.__origin__, this.__offset__);
-                  })
-                  .on("dragend", function() {
-                      delete this.__origin__;
-                      delete this.__offset__;
-                  }));
+        var slider = d3.select(this.selector + " .slider");
+        slider.attr("transform",
+                    "translate(" + (self.slider.x + 1) + ")");
 
-        // dragging on left/right sizers
-        var sizer_spec = d3.behavior.drag()
-                  .on("dragstart", function(d) {
-                      var clazz = this.className.baseVal;
-                      this.__origin__ = self[clazz].x;
-                      this.__offset__ = 0;
-                  })
-                  .on("drag", function(d) {
-                      this.__offset__ += d3.event.dx;
-                      self.move_sizer(this);
-                  })
-                  .on("dragend", function() {
-                      delete this.__origin__;
-                      delete this.__offset__;
-                      self.sizer_end(this);
-                  });
-        left.call(sizer_spec);
-        right.call(sizer_spec);
+        var left = container.select(".left");
+        left.attr("transform", "translate(0)");
 
+        var right = container.select(".right");
+        var right_x = self.slider.w - sizer_w*2;
+        right.attr("transform",
+                   "translate(" + right_x + ")");
+        var slider_top_border = container.select(".slider-top-border");
+        slider_top_border.attr("x2", self.slider.w - sizer_w - 2);
+
+        var handle = slider.select(".handle.bottom");
+        handle.attr("width", handle_w);
+
+        var ridges = slider.select(".ridges");
+        ridges.attr("transform", "translate(" + rl+ ")");
     };
 
     self.move_slider = function(origin, dx) {
@@ -705,18 +732,28 @@ function d3_tsline(id) {
     self.sizer_end = function(sizer) {
         var clazz = sizer.className.baseVal;
         var diffpx = self[clazz].x;
+        var one = self.one_series();
         // px to data points
-        var diff = Math.round(diffpx * (self.data.length / self.width));
-        //console.log(self.data.length, self.width, diffpx, diff);
+        var diff = Math.round(diffpx * (one.data.length / self.width));
+        console.log("data.length", one.data.length);
+        console.log("self.width", self.width);
+        console.log("self.view_span old", self.view_span);
+        console.log("diffpx", diffpx);
+        console.log("diff", diff);
         if( clazz == "left" ) {
             self.slider.x += diffpx;
             self.view_span -= diff;
         } else {
             self.view_span += diff;
         }
+        console.log("self.view_span new", self.view_span);
         // reset sizer x
         self[clazz].x = 0;
+
+        // recalc and redraw
+        self.update_summary_calcs();
         self.draw_view();
+        self.draw_slider();
     };
 
     self.destroy = function() {
