@@ -13,8 +13,12 @@ function d3_tsline(id) {
         data: { x: [0,0], y: [0,0] }
     };
 
-    self.width = 1000;
-    self.height = 400;
+    var options = { };
+    if(arguments.length >= 2){
+        options = arguments[1];
+    }
+    self.width = options.width || 1000;
+    self.height = options.height || 400;
     self.summary_height = 50;
     self.handle_height = 14;
     self.summary_margin = 15;
