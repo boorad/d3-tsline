@@ -1,6 +1,6 @@
 
 
-function d3_tsline(id) {
+function d3_tsline(id, options) {
 
     var self = this;
 
@@ -13,12 +13,17 @@ function d3_tsline(id) {
         data: { x: [0,0], y: [0,0] }
     };
 
-    var options = { };
-    if(arguments.length >= 2){
-        options = arguments[1];
+    if(options === undefined || options === null) {
+        options = self.defaults;
     }
-    self.width = options.width || 1000;
-    self.height = options.height || 400;
+    for(var k in self.defaults) {
+        if(undefined === options[k]) {
+            options[k] = self.defaults[k];
+        }
+    }
+
+    self.width = options.width;
+    self.height = options.height;
     self.summary_height = 50;
     self.handle_height = 14;
     self.summary_margin = 15;
@@ -26,14 +31,14 @@ function d3_tsline(id) {
     // buffer (in px) for showing a bit more y axis than min/max values
     self.y_nice_buffer = 2;
     self.orient_y = "right";
-    self.interpolation = 'cardinal';
-    self.tension = 0.8;
+    self.interpolation = options.interpolation;
+    self.tension = options.tension;
 
     self.scroll_view = true;
     self.scroll_interval = 1000; // in ms
     self.scrolling = false;
 
-    self.show_summary = true;
+    self.show_summary = options.showSummary;
     self.fixed_y = null; // let y axis resize based on min/max of values
     //self.fixed_y = {min: 0-1, max: 100+1}; // fix y axis to 0-100
 
@@ -166,7 +171,7 @@ function d3_tsline(id) {
             start = Math.round(self.slider.x * (max_elem / self.slider.max_x));
             end = start + self.view_span;
         } else {
-            end = self.series.all.data.length || 0;
+            end = self.view_span;
             start = end - self.view_span;
         }
 
@@ -437,7 +442,9 @@ function d3_tsline(id) {
 
 
         }
-
+        else {
+            // todo: we miss bottom border here when not drawing summary            
+        }
     };
 
     self.activate_series = function(series) {
@@ -786,4 +793,13 @@ function d3_tsline(id) {
     // call constructor (after all functions have been loaded)
     self.init();
 
+};
+
+// default settings that can be specifically overriden by passing options argument
+d3_tsline.prototype.defaults = {
+    width: 1000                   // width of the chart
+    , height: 400                 // height of the chart
+    , tension: 0.8                // tension for lines: https://github.com/mbostock/d3/wiki/SVG-Shapes#wiki-line_tension
+    , interpolation: "cardinal"   // interpolation for lines: https://github.com/mbostock/d3/wiki/SVG-Shapes#wiki-line_interpolate
+    , showSummary: true           // displays scrollable summary
 };
