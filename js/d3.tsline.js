@@ -349,6 +349,7 @@ function d3_tsline(id, options) {
             // right border and sizer
             var right = slider_container.append("svg:g")
                 .attr("class", "right");
+            self.right.x = self.slider.w;
 
             right.append("svg:line") // summary right border
                 .attr("y1", 1)
@@ -379,7 +380,7 @@ function d3_tsline(id, options) {
             var handle = slider.append("svg:rect")
                 .attr("class", "handle bottom")
                 .attr("x", 0)
-                .attr("y", self.summary_height + 1)
+                .attr("y", self.summary_height)
                 .attr("width", handle_w)
                 .attr("height", self.handle_height);
 
@@ -425,6 +426,7 @@ function d3_tsline(id, options) {
             var sizer_spec = d3.behavior.drag()
                 .on("dragstart", function(d) {
                     var clazz = this.className.baseVal;
+                    console.log("sizer_spec class: ", clazz, this);
                     this.__origin__ = self[clazz].x;
                     this.__offset__ = 0;
                 })
@@ -734,10 +736,10 @@ function d3_tsline(id, options) {
 
     self.move_sizer = function(sizer) {
         var clazz = sizer.className.baseVal;
+        //console.log(clazz, self.left.x, self.right.x);
         self[clazz].x = sizer.__origin__ + sizer.__offset__;
-        var sizer_new_x = self[clazz].x;
         d3.select(this.selector + " ." + clazz)
-            .attr("transform", "translate(" + sizer_new_x + ")")
+            .attr("transform", "translate(" + self[clazz].x + ")")
     };
 
     self.sizer_end = function(sizer) {
