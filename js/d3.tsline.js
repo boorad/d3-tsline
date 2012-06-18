@@ -770,7 +770,7 @@ function d3_tsline(id, options) {
     };
 
     self.destroy = function() {
-        self.stop_scroll;
+        self.stop_scroll();
         d3.select(self.selector + " .view, " + self.selector + " .summary")
             .remove();
     };
